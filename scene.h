@@ -7,8 +7,8 @@
 #include <vector>
 #include <vecmath.h>
 
-struct SimParams {
-    SimParams() :
+struct SimParam {
+    SimParam() :
         grid(64),
         particles(1024),
         steps(100),
@@ -49,16 +49,16 @@ public:
     Scene(char *fname);
 
     // scene description
-    SimParams params;
-    Camera cam;
+    SimParam param;
+    std::vector<Camera> cameras;
     std::vector<Explosion> explosions;
     std::vector<Object *> objects;
 
 private:
-    // parsing
+    // for parsing
     std::ifstream in;
 
-    void parseSimParams();
+    void parseSimParam();
     void parseCamera();
     void parseObject();
     void parseExplosion();

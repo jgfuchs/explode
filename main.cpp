@@ -13,10 +13,12 @@ int main(int argc, char *argv[]) {
     Scene scene(argv[1]);
     Simulation sim(&scene);
 
-    for (int i = 0; i < scene.params.steps; i++) {
-        sim.advance();
-        sim.render();
-    }
-    
     return 0;
+
+    for (int i = 0; i < scene.param.steps; i++) {
+        sim.advance();
+        for (auto &cam : scene.cameras) {
+            sim.render(cam);
+        }
+    }
 }

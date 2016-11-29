@@ -12,8 +12,8 @@ Scene::Scene(char *fname) : in(fname) {
 
     while (!in.eof()) {
         auto tok = getToken();
-        if (tok == "SimParams") {
-            parseSimParams();
+        if (tok == "SimParam") {
+            parseSimParam();
         } else if (tok == "Camera") {
             parseCamera();
         } else if (tok == "Object") {
@@ -31,28 +31,37 @@ Scene::Scene(char *fname) : in(fname) {
     debugInfo();
 }
 
-void Scene::parseSimParams() {
+void Scene::parseSimParam() {
+    static bool done = false;
+    if (done) {
+        std::cerr << "Error: multiple SimParam defined\n";
+        exit(1);
+    } else {
+        done = true;
+    }
+
     expect("{");
     while (true) {
         auto tok = getToken();
         if (tok == "grid") {
-            params.grid = getInt();
+            param.grid = getInt();
         } else if (tok == "particles") {
-            params.particles = getInt();
+            param.particles = getInt();
         } else if (tok == "timestep") {
-            params.timestep = getFloat();
+            param.timestep = getFloat();
         } else if (tok == "steps") {
-            params.steps = getInt();
+            param.steps = getInt();
         } else if (tok == "}") {
             break;
         } else {
-            std::cerr << "Error: unexpected token '" << tok << "' in SimParams\n";
+            std::cerr << "Error: unexpected token '" << tok << "' in SimParam\n";
             exit(1);
         }
     }
 }
 
 void Scene::parseCamera() {
+    Camera cam;
     expect("{");
     while (true) {
         auto tok = getToken();
@@ -69,6 +78,11 @@ void Scene::parseCamera() {
             exit(1);
         }
     }
+    if (cameras.size()) {
+        std::cerr << "Error: only one camera supported\n";
+        exit(1);
+    }
+    cameras.push_back(cam);
 }
 
 void Scene::parseObject() {
@@ -79,7 +93,6 @@ void Scene::parseObject() {
 
 void Scene::parseExplosion() {
     Explosion ex;
-
     expect("{");
     while (true) {
         auto tok = getToken();
@@ -96,9 +109,8 @@ void Scene::parseExplosion() {
             exit(1);
         }
     }
-
     if (explosions.size()) {
-        std::cerr << "Error: only one explosion per scene supported\n";
+        std::cerr << "Error: only one explosion supported\n";
         exit(1);
     }
     explosions.push_back(ex);
@@ -155,30 +167,33 @@ Vector3f Scene::getVector3f() {
 }
 
 void Scene::debugInfo() {
-    std::cout << "Scene description:\n";
+    std::cout << "Sim params:\n  "
+        << "grid=" << param.grid << " "
+        << "particles=" << param.particles << " "
+        << "steps=" << param.steps << " "
+        << "timestep=" << param.timestep << "\n";
 
-    std::cout << "  simulation: "
-        << "grid=" << params.grid << " "
-        << "particles=" << params.particles << " "
-        << "steps=" << params.steps << " "
-        << "timestep=" << params.timestep << "\n";
+    std::cout << "Cameras:\n";
+    for (unsigned i = 0; i < cameras.size(); i++) {
+        auto cam = cameras[i];
+        std::cout << "  [" << i << "]  "
+            << "pos=" << cam.pos << " "
+            << "center=" << cam.center << " "
+            << "up=" << cam.up << "\n";
+    }
 
-    std::cout << "  camera: "
-        << "pos=" << cam.pos << " "
-        << "center=" << cam.center << " "
-        << "up=" << cam.up << "\n";
-
-    std::cout << "  explosions:\n";
-    for (int i = 0; i < explosions.size(); i++) {
+    std::cout << "Explosions:\n";
+    for (unsigned i = 0; i < explosions.size(); i++) {
         auto ex = explosions[i];
-        std::cout << "    [" << i << "]  "
+        std::cout << "  [" << i << "]  "
             << "pos=" << ex.pos << " "
             << "size=" << ex.size << " "
             << "t0=" << ex.t0 << "\n";
     }
 
-    std::cout << "  objects:\n";
-    for (int i = 0; i < objects.size(); i++) {
-        auto obj = objects[i];
-    }
+    // std::cout << "Objects:\n";
+    // for (unsigned i = 0; i < objects.size(); i++) {
+        // auto obj = objects[i];
+    // }
+    std::cout << std::endl;
 }

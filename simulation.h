@@ -12,9 +12,13 @@ public:
     Simulation(Scene *sc);
 
     void advance();
-    void render();
+    void render(Camera &cam);
 private:
     Scene *scene;
+
+    cl::Buffer grid_buf;
+
+    void initOpenCL();
 };
 
 #endif // __SIMULATION_H__

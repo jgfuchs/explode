@@ -2,14 +2,13 @@ cmake_minimum_required(VERSION 3.1)
 
 project(explode)
 
-list(APPEND LIBS asprintf)
-
-include_directories(/home/jfuchs/Desktop/boost-compute/include)
 list(APPEND LIBS OpenCL)
 
 include_directories(vecmath/include)
 add_subdirectory(vecmath)
 list(APPEND LIBS vecmath)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 list(APPEND SRC_FILES
     main.cpp
@@ -19,8 +18,8 @@ list(APPEND SRC_FILES
 )
 
 list(APPEND CL_FILES
-    render.cl
     simulate.cl
+    render.cl
 )
 
 add_executable(explode ${SRC_FILES} ${CL_FILES})
