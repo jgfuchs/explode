@@ -1,3 +1,5 @@
+/* -*- C++ -*- */
+
 #ifndef VECMATH_H
 #define VECMATH_H
 
