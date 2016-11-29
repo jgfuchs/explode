@@ -1,0 +1,15 @@
+SimParams {
+    grid 64
+    particles 128
+    timestep 0.01
+}
+
+Camera {
+    pos 0 0 -10
+    up 0 1 0
+    center 0 0 0
+}
+
+Explosion {
+    t0 0.5
+}
