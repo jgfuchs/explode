@@ -16,9 +16,13 @@ public:
 private:
     Scene *scene;
 
-    cl::Buffer grid_buf;
+    cl::Context ctx;
+    cl::CommandQueue clq;
 
     void initOpenCL();
+    void createBuffers();
+    
+    void checkErr(int err, std::string msg);
 };
 
 #endif // __SIMULATION_H__
