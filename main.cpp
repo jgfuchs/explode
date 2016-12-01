@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
 
     return 0;
 
-    for (int i = 0; i < scene.param.steps; i++) {
+    for (int i = 0; i < scene.nsteps; i++) {
         sim.advance();
         for (auto &cam : scene.cameras) {
             sim.render(cam);

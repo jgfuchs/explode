@@ -3,6 +3,7 @@
 #ifndef __SIMULATION_H__
 #define __SIMULATION_H__
 
+#define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
 #include "scene.h"
@@ -22,7 +23,7 @@ private:
     void initOpenCL();
     void initBuffers();
 
-    void checkErr(int err, std::string msg);
+    void handleError(cl::Error err);
 };
 
 #endif // __SIMULATION_H__

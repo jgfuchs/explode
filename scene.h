@@ -7,19 +7,6 @@
 #include <vector>
 #include <vecmath.h>
 
-struct SimParam {
-    SimParam() :
-        grid(64),
-        particles(1024),
-        steps(100),
-        timestep(0.01f) {}
-
-    int grid;
-    int particles;
-    int steps;
-    float timestep;
-};
-
 struct Camera {
     Camera() :
         pos(Vector3f(0, 0, -10)),
@@ -51,8 +38,12 @@ class Scene {
 public:
     Scene(char *fname);
 
+    // simulation parameters
+    int grid_w, grid_h, grid_d;
+    int nsteps, nparticles;
+    float timestep;
+
     // scene description
-    SimParam param;
     std::vector<Camera> cameras;
     std::vector<Explosion> explosions;
     std::vector<Object *> objects;
@@ -61,7 +52,7 @@ private:
     // for parsing
     std::ifstream in;
 
-    void parseSimParam();
+    void parseSimParams();
     void parseCamera();
     void parseObject();
     void parseExplosion();

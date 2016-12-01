@@ -4,7 +4,12 @@
 
 #include "scene.h"
 
-Scene::Scene(char *fname) : in(fname) {
+Scene::Scene(char *fname) :
+    grid_w(64), grid_h(64), grid_d(64),
+    nsteps(10), nparticles(1000),
+    timestep(0.01),
+    in(fname)
+{
     if (!in.is_open()) {
         std::cerr << "Error: couldn't open scene file '" << fname << "'\n";
         exit(1);
@@ -13,7 +18,7 @@ Scene::Scene(char *fname) : in(fname) {
     while (!in.eof()) {
         auto tok = getToken();
         if (tok == "SimParam") {
-            parseSimParam();
+            parseSimParams();
         } else if (tok == "Camera") {
             parseCamera();
         } else if (tok == "Object") {
@@ -31,7 +36,7 @@ Scene::Scene(char *fname) : in(fname) {
     debugInfo();
 }
 
-void Scene::parseSimParam() {
+void Scene::parseSimParams() {
     static bool done = false;
     if (done) {
         std::cerr << "Error: multiple SimParam defined\n";
@@ -44,13 +49,15 @@ void Scene::parseSimParam() {
     while (true) {
         auto tok = getToken();
         if (tok == "grid") {
-            param.grid = getInt();
+            grid_w = getInt();
+            grid_h = getInt();
+            grid_d = getInt();
         } else if (tok == "particles") {
-            param.particles = getInt();
+            nparticles = getInt();
         } else if (tok == "timestep") {
-            param.timestep = getFloat();
-        } else if (tok == "steps") {
-            param.steps = getInt();
+            timestep = getFloat();
+        } else if (tok == "nsteps") {
+            nsteps = getInt();
         } else if (tok == "}") {
             break;
         } else {
@@ -171,10 +178,10 @@ Vector3f Scene::getVector3f() {
 
 void Scene::debugInfo() {
     std::cout << "Sim params:\n  "
-        << "grid=" << param.grid << " "
-        << "particles=" << param.particles << " "
-        << "steps=" << param.steps << " "
-        << "timestep=" << param.timestep << "\n";
+        << "grid=(" << grid_w << ", " << grid_h << ", " << grid_d << ") "
+        << "particles=" << nparticles << " "
+        << "steps=" << nsteps << " "
+        << "timestep=" << timestep << "\n";
 
     std::cout << "Cameras:\n";
     for (unsigned i = 0; i < cameras.size(); i++) {

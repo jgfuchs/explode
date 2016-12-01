@@ -1,4 +1,4 @@
 
-void __kernel initialize() {
+void __kernel initialize(__global int *values) {
 
 }
