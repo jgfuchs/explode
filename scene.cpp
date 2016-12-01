@@ -71,6 +71,9 @@ void Scene::parseCamera() {
             cam.center = getVector3f();
         } else if (tok == "up") {
             cam.up = getVector3f();
+        } else if (tok == "size") {
+            cam.width = getInt();
+            cam.height = getInt();
         } else if (tok == "}") {
             break;
         } else {
@@ -179,7 +182,8 @@ void Scene::debugInfo() {
         std::cout << "  [" << i << "]  "
             << "pos=" << cam.pos << " "
             << "center=" << cam.center << " "
-            << "up=" << cam.up << "\n";
+            << "up=" << cam.up << " "
+            << "size=(" << cam.width << ", " << cam.height << ")" << "\n";
     }
 
     std::cout << "Explosions:\n";

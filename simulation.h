@@ -20,8 +20,8 @@ private:
     cl::CommandQueue clq;
 
     void initOpenCL();
-    void createBuffers();
-    
+    void initBuffers();
+
     void checkErr(int err, std::string msg);
 };
 

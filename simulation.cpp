@@ -3,6 +3,7 @@
 
 Simulation::Simulation(Scene *sc) : scene(sc) {
     initOpenCL();
+    initBuffers();
 }
 
 void Simulation::advance() {
@@ -34,7 +35,7 @@ void Simulation::initOpenCL() {
     // TODO: create kernels (and kernel functors?)
 }
 
-void Simulation::createBuffers() {
+void Simulation::initBuffers() {
     // TODO: create state buffers on device
 }
 

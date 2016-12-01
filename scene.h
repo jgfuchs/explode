@@ -24,9 +24,12 @@ struct Camera {
     Camera() :
         pos(Vector3f(0, 0, -10)),
         center(Vector3f(0, 0, 0)),
-        up(Vector3f(0, 1, 0)) {}
+        up(Vector3f(0, 1, 0)),
+        width(600),
+        height(600) {}
 
     Vector3f pos, center, up;
+    unsigned width, height;
 };
 
 struct Explosion {
