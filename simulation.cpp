@@ -16,17 +16,9 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params)
 }
 
 void Simulation::advance() {
-    try {
-        advectField(U, U, U_tmp);
-        advectField(U, U, U_tmp);
-        advectField(U, U, U_tmp);
-        advectField(U, U, U_tmp);
-        advectField(U, U, U_tmp);
-        advectField(U, U, U_tmp);
-    } catch (cl::Error err) {
-        std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
-        exit(1);
-    }
+    advectField(U, U, U_tmp);
+
+
 }
 
 void Simulation::render(HostImage &img) {
@@ -88,21 +80,21 @@ void Simulation::initGrid() {
     profile(INIT_GRID);
 }
 
-void Simulation::advectField(cl::Image3D &F, cl::Image3D &V, cl::Image3D &V_out) {
+void Simulation::advectField(cl::Image3D &field, cl::Image3D &values, cl::Image3D &output) {
     kAdvectField.setArg(0, prms.dt);
-    kAdvectField.setArg(1, F);
-    kAdvectField.setArg(2, V);
-    kAdvectField.setArg(3, V_out);
+    kAdvectField.setArg(1, field);
+    kAdvectField.setArg(2, values);
+    kAdvectField.setArg(3, output);
     queue.enqueueNDRangeKernel(kAdvectField, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(ADVECT_FIELD);
 }
 
-void Simulation::advectScalar(cl::Image3D &F, cl::Image3D &S, cl::Image3D &S_out) {
+void Simulation::advectScalar(cl::Image3D &field, cl::Image3D &values, cl::Image3D &output) {
     kAdvectScalar.setArg(0, prms.dt);
-    kAdvectScalar.setArg(1, F);
-    kAdvectScalar.setArg(2, S);
-    kAdvectScalar.setArg(3, S_out);
+    kAdvectScalar.setArg(1, field);
+    kAdvectScalar.setArg(2, values);
+    kAdvectScalar.setArg(3, output);
     queue.enqueueNDRangeKernel(kAdvectScalar, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(ADVECT_SCALAR);
