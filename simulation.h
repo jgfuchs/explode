@@ -27,6 +27,8 @@ private:
 
     // fluid dynamics
     void advect(cl::Image3D&, cl::Image3D&);
+    void divergence();
+    void jacobi();
     void project();
 
     // helper functions
@@ -34,24 +36,29 @@ private:
 
     const Scene *scene;
     const SimParams prms;
+    float t;
 
     // OpenCL management
     cl::Program program;
     cl::Context context;
     cl::CommandQueue queue;
 
-    cl::Kernel kInitGrid, kAdvect, kProject, kRender;
+    cl::Kernel kInitGrid, kAdvect, kDivergence, kJacobi, kProject, kRender;
     cl::NDRange gridRange, groupRange;
 
     // state variables
     cl::Image3D U, U_tmp,       // velocity vector field
-                P, P_tmp,       // pressure scalar field
-                T, T_tmp;       // thermo: (temperature, fuel, soot)
+                T, T_tmp,       // thermo: (temperature, fuel, smoke)
+                B;              // boundaries
+
+    // intermediates
+    cl::Image3D Dvg,            // divergence
+                P, P_tmp;       // pressure
 
     cl::Image2D target;         // render target
 
     // profiling
-    enum {INIT_GRID, ADVECT, PROJECT, RENDER, _LAST};
+    enum {INIT_GRID, ADVECT, DIVERGENCE, ZERO_P, JACOBI, PROJECT, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;

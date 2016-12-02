@@ -2,7 +2,7 @@
 #include "clerror.h"
 #include <iomanip>
 
-Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params)
+Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
 {
     try {
         initOpenCL();
@@ -17,8 +17,20 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params)
 
 void Simulation::advance() {
     advect(U, U_tmp);
-    advect(P, P_tmp);
     advect(T, T_tmp);
+    std::swap(U, U_tmp);
+    std::swap(T, T_tmp);
+
+    divergence();
+    jacobi();
+    try {
+        project();
+    } catch (cl::Error err) {
+        std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
+        exit(1);
+    }
+
+    t += prms.dt;
 }
 
 void Simulation::render(HostImage &img) {
@@ -27,8 +39,8 @@ void Simulation::render(HostImage &img) {
 
     // render to target image
     kRender.setArg(0, U);
-    kRender.setArg(1, P);
-    kRender.setArg(2, T);
+    kRender.setArg(1, T);
+    kRender.setArg(2, B);
     kRender.setArg(3, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
@@ -67,6 +79,9 @@ void Simulation::initOpenCL() {
     // load kernels from the program
     kInitGrid = cl::Kernel(program, "init_grid");
     kAdvect = cl::Kernel(program, "advect");
+    kDivergence = cl::Kernel(program, "divergence");
+    kJacobi = cl::Kernel(program, "jacobi");
+    kProject = cl::Kernel(program, "project");
     kRender = cl::Kernel(program, "render");
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
@@ -76,12 +91,13 @@ void Simulation::initOpenCL() {
     // create buffers
     U = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
     U_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-
-    P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-    P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-
     T = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
     T_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
+    B = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_UNSIGNED_INT8), w, h, d);
+
+    Dvg = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
 
     // create render target
     target = cl::Image2D(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
@@ -97,8 +113,8 @@ void Simulation::initProfiling() {
 
 void Simulation::initGrid() {
     kInitGrid.setArg(0, U);
-    kInitGrid.setArg(1, P);
-    kInitGrid.setArg(2, T);
+    kInitGrid.setArg(1, T);
+    kInitGrid.setArg(2, B);
     queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(INIT_GRID);
@@ -115,14 +131,47 @@ void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
     profile(ADVECT);
 }
 
-void Simulation::project() {
+void Simulation::divergence() {
+    kDivergence.setArg(0, prms.cellSize);
+    kDivergence.setArg(1, U);
+    kDivergence.setArg(2, Dvg);
+    queue.enqueueNDRangeKernel(kDivergence, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(DIVERGENCE);
+}
 
-    const int NITERATIONS = 1;
+void Simulation::jacobi() {
+    // clear pressure to zero
+    cl_float4 zeros = {0, 0, 0, 0};
+    cl::size_t<3> origin;
+    cl::size_t<3> region;
+    region[0] = prms.grid_w;
+    region[1] = prms.grid_h;
+    region[2] = prms.grid_d;
+    queue.enqueueFillImage(P, zeros, origin, region, NULL, &event);
+    event.wait();
+    profile(ZERO_P);
+
+    // solve Poisson equation for pressure to ensure incompressibility
+    const int NITERATIONS = 2;
     for (int i = 0; i < NITERATIONS; i++) {
-
+        kJacobi.setArg(0, P);
+        kJacobi.setArg(1, Dvg);
+        kJacobi.setArg(2, P_tmp);
+        queue.enqueueNDRangeKernel(kJacobi, cl::NullRange, gridRange, groupRange, NULL, &event);
         event.wait();
-        profile(PROJECT);
+        profile(JACOBI);
     }
+}
+
+void Simulation::project() {
+    kProject.setArg(0, prms.cellSize);
+    kProject.setArg(1, U);
+    kProject.setArg(2, P);
+    kProject.setArg(3, U_tmp);
+    queue.enqueueNDRangeKernel(kProject, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(PROJECT);
 }
 
 void Simulation::profile(int pk) {
@@ -133,13 +182,25 @@ void Simulation::profile(int pk) {
 }
 
 void Simulation::dumpProfiling() {
+    int sumC = 0;
+    double sumT = 0, sumAvg = 0;
+
     std::cout << "\nProfiling info\n"
-        << "Kernel\tCalls\tTime (s)\tMean (ms)\n";
+        << "Kernel\tCalls\tTime (s)\tMean (ms)\n" << std::fixed;
     for (int i = 0; i < _LAST; i++) {
-        double t = kernelTimes[i];
         unsigned c = kernelCalls[i];
-        std::cout << "  [" << i << "]\t"
-            << c << "\t" << t << "\t"
-            << (c ? (t / c) : 0.0) * 1e3 << "\n";
+        double t = kernelTimes[i];
+        double avg = (c ? (t / c) : 0.0) * 1e3;
+
+        std::cout << " [" << i << "]\t" << c;
+        if (c) {
+            std::cout << "\t" << t << "\t" << avg;
+        }
+        std::cout << "\n";
+
+        sumC += c;
+        sumT += t;
+        sumAvg += avg;
     }
+    std::cout << "Total:\t" << sumC << "\t" << sumT << "\t" << sumAvg << "\n";
 }

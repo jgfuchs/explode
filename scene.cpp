@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 
 #include "scene.h"
 
@@ -29,6 +30,9 @@ Scene::Scene(char *fname) : in(fname) {
     }
 
     debugInfo();
+
+    std::sort(explosions.begin(), explosions.end(),
+        [](Explosion a, Explosion b) { return a.t0 > b.t0;});
 }
 
 void Scene::parseSimParams() {
@@ -119,10 +123,10 @@ void Scene::parseExplosion() {
             exit(1);
         }
     }
-    if (explosions.size()) {
-        std::cerr << "Error: only one explosion supported\n";
-        exit(1);
-    }
+    // if (explosions.size()) {
+    //     std::cerr << "Error: only one explosion supported\n";
+    //     exit(1);
+    // }
     explosions.push_back(ex);
 }
 

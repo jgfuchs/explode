@@ -12,5 +12,5 @@ Camera {
 }
 
 Explosion {
-    t0 0.5
+    t0 0.1
 }
