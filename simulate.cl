@@ -1,4 +1,12 @@
 
-void __kernel initialize(__global int *values) {
+void __kernel initialize() {
+
+}
+
+void __kernel advect_field() {
+
+}
+
+void __kernel advect_scalar() {
 
 }

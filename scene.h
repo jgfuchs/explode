@@ -44,7 +44,8 @@ public:
     float timestep;
 
     // scene description
-    std::vector<Camera> cameras;
+    Camera cam;
+    // std::vector<Camera> cameras;
     std::vector<Explosion> explosions;
     std::vector<Object *> objects;
 

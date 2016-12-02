@@ -68,7 +68,6 @@ void Scene::parseSimParams() {
 }
 
 void Scene::parseCamera() {
-    Camera cam;
     expect("{");
     while (true) {
         auto tok = getToken();
@@ -88,11 +87,6 @@ void Scene::parseCamera() {
             exit(1);
         }
     }
-    if (cameras.size()) {
-        std::cerr << "Error: only one camera supported\n";
-        exit(1);
-    }
-    cameras.push_back(cam);
 }
 
 void Scene::parseObject() {
@@ -177,21 +171,17 @@ Vector3f Scene::getVector3f() {
 }
 
 void Scene::debugInfo() {
-    std::cout << "Sim params:\n  "
+    std::cout << "Params: "
         << "grid=(" << grid_w << ", " << grid_h << ", " << grid_d << ") "
         << "particles=" << nparticles << " "
         << "steps=" << nsteps << " "
         << "timestep=" << timestep << "\n";
 
-    std::cout << "Cameras:\n";
-    for (unsigned i = 0; i < cameras.size(); i++) {
-        auto cam = cameras[i];
-        std::cout << "  [" << i << "]  "
-            << "pos=" << cam.pos << " "
-            << "center=" << cam.center << " "
-            << "up=" << cam.up << " "
-            << "size=(" << cam.width << ", " << cam.height << ")" << "\n";
-    }
+    std::cout << "Camera: "
+        << "pos=" << cam.pos << " "
+        << "center=" << cam.center << " "
+        << "up=" << cam.up << " "
+        << "size=(" << cam.width << ", " << cam.height << ")" << "\n";
 
     std::cout << "Explosions:\n";
     for (unsigned i = 0; i < explosions.size(); i++) {

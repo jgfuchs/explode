@@ -1,8 +1,17 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <iomanip>
 
 #include "scene.h"
 #include "simulation.h"
+
+void saveImage(HostImage &img, int idx) {
+    std::ostringstream fname;
+    fname << std::setfill('0') << std::setw(4);
+    fname << "output/frame-" << idx << ".png";
+    img.write(fname.str());
+}
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -13,12 +22,12 @@ int main(int argc, char *argv[]) {
     Scene scene(argv[1]);
     Simulation sim(&scene);
 
-    return 0;
-
+    HostImage img(scene.cam.width, scene.cam.height);
     for (int i = 0; i < scene.nsteps; i++) {
         sim.advance();
-        for (auto &cam : scene.cameras) {
-            sim.render(cam);
-        }
+        sim.render(img);
+        saveImage(img, i);
+
+        break;
     }
 }

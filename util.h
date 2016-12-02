@@ -3,7 +3,17 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
-void writeJPEG(char *fname);
+
+// an image in host memory
+class HostImage {
+public:
+    HostImage(int w, int h);
+    ~HostImage();
+    void write(std::string fname);
+
+    int w, h;
+    char *data;
+};
 
 std::string slurpFile(std::string fname);
 

@@ -1,5 +1,5 @@
 SimParam {
-    grid 64 64 64
+    grid 64 256 64
     particles 1024
     timestep 0.01
 }
