@@ -1,7 +1,8 @@
 #include "simulation.h"
 #include "clerror.h"
 
-Simulation::Simulation(Scene *sc) : scene(sc) {
+Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params)
+{
     try {
         initOpenCL();
     } catch (cl::Error err) {
@@ -9,12 +10,22 @@ Simulation::Simulation(Scene *sc) : scene(sc) {
         exit(1);
     }
 
-    // int x;
-    // std::cin >> x;
+    initProfiling();
+    initGrid();
 }
 
 void Simulation::advance() {
-
+    try {
+        advectField(U, U, U_tmp);
+        advectField(U, U, U_tmp);
+        advectField(U, U, U_tmp);
+        advectField(U, U, U_tmp);
+        advectField(U, U, U_tmp);
+        advectField(U, U, U_tmp);
+    } catch (cl::Error err) {
+        std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
+        exit(1);
+    }
 }
 
 void Simulation::render(HostImage &img) {
@@ -27,11 +38,11 @@ void Simulation::initOpenCL() {
     std::cout << "OpenCL platform: " << platform.getInfo<CL_PLATFORM_NAME>() << "\n";
     std::cout << "OpenCL device: " << device.getInfo<CL_DEVICE_NAME>() << "\n";
 
-    ctx = cl::Context(device);
-    clq = cl::CommandQueue(ctx, device);
+    context = cl::Context(device);
+    queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE);
 
     // read & compile simulation program
-    program = cl::Program(ctx, slurpFile("simulate.cl"));
+    program = cl::Program(context, slurpFile("simulate.cl"));
     try {
         program.build();
     } catch (cl::Error err) {
@@ -41,20 +52,82 @@ void Simulation::initOpenCL() {
     }
 
     // load kernels from the program
-    kInit = cl::Kernel(program, "initialize");
+    kInitGrid = cl::Kernel(program, "init_grid");
     kAdvectField = cl::Kernel(program, "advect_field");
     kAdvectScalar = cl::Kernel(program, "advect_scalar");
 
+
+    int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
+    gridRange = cl::NDRange(w, h, d);
+    groupRange = cl::NDRange(8, 8, 8);
+
     // create buffers
-    int w = scene->grid_w, h = scene->grid_h, d = scene->grid_d;
+    U = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
+    U_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
 
-    U = cl::Image3D(ctx, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-    U_tmp = cl::Image3D(ctx, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-
-    P = cl::Image3D(ctx, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-    P_tmp = cl::Image3D(ctx, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
 
     // create render target
-    target = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
+    target = cl::Image2D(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
         scene->cam.width, scene->cam.height);
+}
+
+void Simulation::initProfiling() {
+    for (int i = 0; i < _LAST; i++) {
+        kernelTimes[i] = 0.0f;
+        kernelCalls[i] = 0;
+    }
+}
+
+void Simulation::initGrid() {
+    kInitGrid.setArg(0, U);
+    kInitGrid.setArg(1, P);
+    queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(INIT_GRID);
+}
+
+void Simulation::advectField(cl::Image3D &F, cl::Image3D &V, cl::Image3D &V_out) {
+    kAdvectField.setArg(0, prms.dt);
+    kAdvectField.setArg(1, F);
+    kAdvectField.setArg(2, V);
+    kAdvectField.setArg(3, V_out);
+    queue.enqueueNDRangeKernel(kAdvectField, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(ADVECT_FIELD);
+}
+
+void Simulation::advectScalar(cl::Image3D &F, cl::Image3D &S, cl::Image3D &S_out) {
+    kAdvectScalar.setArg(0, prms.dt);
+    kAdvectScalar.setArg(1, F);
+    kAdvectScalar.setArg(2, S);
+    kAdvectScalar.setArg(3, S_out);
+    queue.enqueueNDRangeKernel(kAdvectScalar, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(ADVECT_SCALAR);
+}
+
+void Simulation::project() {
+
+    const int NITERATIONS = 1;
+    for (int i = 0; i < NITERATIONS; i++) {
+        queue.enqueueNDRangeKernel(kAdvectScalar, cl::NullRange, gridRange, groupRange, NULL, &event);
+        event.wait();
+        profile(PROJECT);
+    }
+}
+
+void Simulation::profile(int pk) {
+    cl_ulong t2 = event.getProfilingInfo<CL_PROFILING_COMMAND_START>();
+    cl_ulong t3 = event.getProfilingInfo<CL_PROFILING_COMMAND_END>();
+    kernelTimes[pk] += (t3 - t2) * 1e-9;
+    kernelCalls[pk]++;
+}
+
+void Simulation::dumpProfiling() {
+    for (int i = 0; i < _LAST; i++) {
+        double t = kernelTimes[i];
+        unsigned c = kernelCalls[i];
+    }
 }

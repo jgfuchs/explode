@@ -7,6 +7,16 @@
 #include <vector>
 #include <vecmath.h>
 
+struct SimParams {
+    SimParams() :
+        grid_w(128), grid_h(128), grid_d(128),
+        nsteps(10), dt(0.01), cellSize(0.1) {}
+
+    int grid_w, grid_h, grid_d;
+    int nsteps;
+    float dt, cellSize;
+};
+
 struct Camera {
     Camera() :
         pos(Vector3f(0, 0, -10)),
@@ -38,14 +48,9 @@ class Scene {
 public:
     Scene(char *fname);
 
-    // simulation parameters
-    int grid_w, grid_h, grid_d;
-    int nsteps, nparticles;
-    float timestep;
-
     // scene description
+    SimParams params;
     Camera cam;
-    // std::vector<Camera> cameras;
     std::vector<Explosion> explosions;
     std::vector<Object *> objects;
 

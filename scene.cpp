@@ -4,12 +4,7 @@
 
 #include "scene.h"
 
-Scene::Scene(char *fname) :
-    grid_w(64), grid_h(64), grid_d(64),
-    nsteps(10), nparticles(1000),
-    timestep(0.01),
-    in(fname)
-{
+Scene::Scene(char *fname) : in(fname) {
     if (!in.is_open()) {
         std::cerr << "Error: couldn't open scene file '" << fname << "'\n";
         exit(1);
@@ -49,15 +44,15 @@ void Scene::parseSimParams() {
     while (true) {
         auto tok = getToken();
         if (tok == "grid") {
-            grid_w = getInt();
-            grid_h = getInt();
-            grid_d = getInt();
-        } else if (tok == "particles") {
-            nparticles = getInt();
-        } else if (tok == "timestep") {
-            timestep = getFloat();
+            params.grid_w = getInt();
+            params.grid_h = getInt();
+            params.grid_d = getInt();
+        } else if (tok == "dt") {
+            params.dt = getFloat();
         } else if (tok == "nsteps") {
-            nsteps = getInt();
+            params.nsteps = getInt();
+        } else if (tok == "cellSize") {
+            params.cellSize = getFloat();
         } else if (tok == "}") {
             break;
         } else {
@@ -172,10 +167,10 @@ Vector3f Scene::getVector3f() {
 
 void Scene::debugInfo() {
     std::cout << "Params: "
-        << "grid=(" << grid_w << ", " << grid_h << ", " << grid_d << ") "
-        << "particles=" << nparticles << " "
-        << "steps=" << nsteps << " "
-        << "timestep=" << timestep << "\n";
+        << "grid=(" << params.grid_w << ", " << params.grid_h << ", " << params.grid_d << ") "
+        << "steps=" << params.nsteps << " "
+        << "dt=" << params.dt << " "
+        << "cellSize=" << params.cellSize << "\n";
 
     std::cout << "Camera: "
         << "pos=" << cam.pos << " "

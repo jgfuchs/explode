@@ -23,11 +23,12 @@ int main(int argc, char *argv[]) {
     Simulation sim(&scene);
 
     HostImage img(scene.cam.width, scene.cam.height);
-    for (int i = 0; i < scene.nsteps; i++) {
+    for (int i = 0; i < scene.params.nsteps; i++) {
         sim.advance();
-        sim.render(img);
-        saveImage(img, i);
+        // sim.render(img);
+        // saveImage(img, i);
 
         break;
     }
+    sim.dumpProfiling();
 }
