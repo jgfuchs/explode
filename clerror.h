@@ -1,3 +1,5 @@
+/* -*- C++ -*- */
+
 static const char *getCLError(int err) {
     switch (err) {
         case CL_SUCCESS: return "CL_SUCCESS";

@@ -82,6 +82,10 @@ void Scene::parseCamera() {
         } else if (tok == "size") {
             cam.width = getInt();
             cam.height = getInt();
+            if (cam.width % 16 || cam.height % 16) {
+                std::cerr << "Error: image dimensions must be multiple of 16\n";
+                exit(1);
+            }
         } else if (tok == "}") {
             break;
         } else {

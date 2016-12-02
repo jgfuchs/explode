@@ -16,13 +16,33 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params)
 }
 
 void Simulation::advance() {
-    advectField(U, U, U_tmp);
-
-
+    advect(U, U_tmp);
+    advect(P, P_tmp);
+    advect(T, T_tmp);
 }
 
 void Simulation::render(HostImage &img) {
+    int w = scene->cam.width,
+        h = scene->cam.height;
 
+    // render to target image
+    kRender.setArg(0, U);
+    kRender.setArg(1, P);
+    kRender.setArg(2, T);
+    kRender.setArg(3, target);
+    queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
+            cl::NDRange(16, 16), NULL, &event);
+    event.wait();
+    profile(RENDER);
+
+    // read rendered image into host memory
+    cl::size_t<3> origin;
+    cl::size_t<3> region;
+    region[0] = w;
+    region[1] = h;
+    region[2] = 1;
+    queue.enqueueReadImage(target, true, origin, region, 0, 0, img.data, NULL, &event);
+    event.wait();
 }
 
 void Simulation::initOpenCL() {
@@ -46,8 +66,8 @@ void Simulation::initOpenCL() {
 
     // load kernels from the program
     kInitGrid = cl::Kernel(program, "init_grid");
-    kAdvectField = cl::Kernel(program, "advect_field");
-    kAdvectScalar = cl::Kernel(program, "advect_scalar");
+    kAdvect = cl::Kernel(program, "advect");
+    kRender = cl::Kernel(program, "render");
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
     gridRange = cl::NDRange(w, h, d);
@@ -59,6 +79,9 @@ void Simulation::initOpenCL() {
 
     P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
     P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+
+    T = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
+    T_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
 
     // create render target
     target = cl::Image2D(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
@@ -75,36 +98,28 @@ void Simulation::initProfiling() {
 void Simulation::initGrid() {
     kInitGrid.setArg(0, U);
     kInitGrid.setArg(1, P);
+    kInitGrid.setArg(2, T);
     queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(INIT_GRID);
 }
 
-void Simulation::advectField(cl::Image3D &field, cl::Image3D &values, cl::Image3D &output) {
-    kAdvectField.setArg(0, prms.dt);
-    kAdvectField.setArg(1, field);
-    kAdvectField.setArg(2, values);
-    kAdvectField.setArg(3, output);
-    queue.enqueueNDRangeKernel(kAdvectField, cl::NullRange, gridRange, groupRange, NULL, &event);
+void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
+    kAdvect.setArg(0, prms.dt);
+    kAdvect.setArg(1, prms.cellSize);
+    kAdvect.setArg(2, U);
+    kAdvect.setArg(3, in);
+    kAdvect.setArg(4, out);
+    queue.enqueueNDRangeKernel(kAdvect, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
-    profile(ADVECT_FIELD);
-}
-
-void Simulation::advectScalar(cl::Image3D &field, cl::Image3D &values, cl::Image3D &output) {
-    kAdvectScalar.setArg(0, prms.dt);
-    kAdvectScalar.setArg(1, field);
-    kAdvectScalar.setArg(2, values);
-    kAdvectScalar.setArg(3, output);
-    queue.enqueueNDRangeKernel(kAdvectScalar, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
-    profile(ADVECT_SCALAR);
+    profile(ADVECT);
 }
 
 void Simulation::project() {
 
     const int NITERATIONS = 1;
     for (int i = 0; i < NITERATIONS; i++) {
-        queue.enqueueNDRangeKernel(kAdvectScalar, cl::NullRange, gridRange, groupRange, NULL, &event);
+
         event.wait();
         profile(PROJECT);
     }

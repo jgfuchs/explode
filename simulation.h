@@ -26,32 +26,32 @@ private:
     void initGrid();
 
     // fluid dynamics
-    void advectField(cl::Image3D&, cl::Image3D&, cl::Image3D&);
-    void advectScalar(cl::Image3D&, cl::Image3D&, cl::Image3D&);
+    void advect(cl::Image3D&, cl::Image3D&);
     void project();
 
     // helper functions
     void profile(int pk);
 
-    Scene *scene;
-    SimParams prms;
+    const Scene *scene;
+    const SimParams prms;
 
     // OpenCL management
     cl::Program program;
     cl::Context context;
     cl::CommandQueue queue;
 
-    cl::Kernel kInitGrid, kAdvectField, kAdvectScalar, kProject;
+    cl::Kernel kInitGrid, kAdvect, kProject, kRender;
     cl::NDRange gridRange, groupRange;
 
     // state variables
     cl::Image3D U, U_tmp,       // velocity vector field
-                P, P_tmp;       // pressure scalar field
+                P, P_tmp,       // pressure scalar field
+                T, T_tmp;       // thermo: (temperature, fuel, soot)
 
     cl::Image2D target;         // render target
 
     // profiling
-    enum {INIT_GRID, ADVECT_FIELD, ADVECT_SCALAR, PROJECT, _LAST} ProfKernel;
+    enum {INIT_GRID, ADVECT, PROJECT, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;
