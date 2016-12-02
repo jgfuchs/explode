@@ -44,9 +44,16 @@ void Scene::parseSimParams() {
     while (true) {
         auto tok = getToken();
         if (tok == "grid") {
-            params.grid_w = getInt();
-            params.grid_h = getInt();
-            params.grid_d = getInt();
+            int w = getInt(),
+                h = getInt(),
+                d = getInt();
+            if (w % 8 || h % 8 || d % 8) {
+                std::cerr << "Error: grid dimensions must be multiple of 8\n";
+                exit(1);
+            }
+            params.grid_w = w;
+            params.grid_h = h;
+            params.grid_d = d;
         } else if (tok == "dt") {
             params.dt = getFloat();
         } else if (tok == "nsteps") {

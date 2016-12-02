@@ -1,5 +1,6 @@
 #include "simulation.h"
 #include "clerror.h"
+#include <iomanip>
 
 Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params)
 {
@@ -55,7 +56,6 @@ void Simulation::initOpenCL() {
     kInitGrid = cl::Kernel(program, "init_grid");
     kAdvectField = cl::Kernel(program, "advect_field");
     kAdvectScalar = cl::Kernel(program, "advect_scalar");
-
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
     gridRange = cl::NDRange(w, h, d);
@@ -126,8 +126,13 @@ void Simulation::profile(int pk) {
 }
 
 void Simulation::dumpProfiling() {
+    std::cout << "\nProfiling info\n"
+        << "Kernel\tCalls\tTime (s)\tMean (ms)\n";
     for (int i = 0; i < _LAST; i++) {
         double t = kernelTimes[i];
         unsigned c = kernelCalls[i];
+        std::cout << "  [" << i << "]\t"
+            << c << "\t" << t << "\t"
+            << (c ? (t / c) : 0.0) * 1e3 << "\n";
     }
 }
