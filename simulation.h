@@ -27,6 +27,8 @@ private:
 
     // fluid dynamics
     void advect(cl::Image3D&, cl::Image3D&);
+    void addForces();
+    void reaction();
     void divergence();
     void jacobi();
     void project();
@@ -43,7 +45,8 @@ private:
     cl::Context context;
     cl::CommandQueue queue;
 
-    cl::Kernel kInitGrid, kAdvect, kDivergence, kJacobi, kProject, kRender;
+    cl::Kernel kInitGrid, kAdvect, kAddForces, kReaction, kDivergence, kJacobi,
+        kProject, kRender;
     cl::NDRange gridRange, groupRange;
 
     // state variables
@@ -58,7 +61,7 @@ private:
     cl::Image2D target;         // render target
 
     // profiling
-    enum {INIT_GRID, ADVECT, DIVERGENCE, ZERO_P, JACOBI, PROJECT, RENDER, _LAST};
+    enum {INIT_GRID, ADVECT, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;

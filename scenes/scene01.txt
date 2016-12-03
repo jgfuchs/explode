@@ -1,14 +1,15 @@
 SimParam {
     grid 128 128 128
+    cellSize 0.5
     dt 0.01
-    cellSize 0.1
+    nsteps 20
 }
 
 Camera {
     pos 0 0 -10
     up 0 1 0
     center 0 0 0
-    size 128 128
+    size 256 256
 }
 
 Explosion {

@@ -10,6 +10,8 @@ __constant sampler_t samp_f =
     CLK_ADDRESS_CLAMP_TO_EDGE |
     CLK_FILTER_LINEAR;
 
+__constant float tAmb = 25;         // ambient temperature
+
 void __kernel init_grid(
     __write_only image3d_t U,       // velocity
     __write_only image3d_t T,       // thermo
@@ -17,7 +19,7 @@ void __kernel init_grid(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     write_imagef(U, pos, 0.0);
-    write_imagef(T, pos, (float4)(25, 0, 0, 0));
+    write_imagef(T, pos, (float4)(tAmb, 0, 0, 0));
 
     int nx = get_image_width(B),
         ny = get_image_height(B),
@@ -42,8 +44,35 @@ void __kernel advect(
     __write_only image3d_t out)
 {
     int3 coord = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    float3 pos = convert_float3(coord) - dt * (1/h) * read_imagef(U, coord).xyz;
+    float3 fcoord = convert_float3(coord) + 0.5f;
+    float3 pos = fcoord - dt * (1/h) * read_imagef(U, coord).xyz;
     write_imagef(out, coord, read_imagef(in, samp_f, pos));
+}
+
+void __kernel add_forces(
+    const float dt,
+    __read_only image3d_t U,
+    __read_only image3d_t T,
+    __write_only image3d_t U_out)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    float t = read_imagef(T, pos).x;
+    float4 v = read_imagef(U, pos);
+    v.y += dt * 0.5 * (t - tAmb);
+    write_imagef(U_out, pos, v);
+}
+
+void __kernel reaction(
+    const float dt,
+    __read_only image3d_t T,
+    __write_only image3d_t T_out)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    if (distance((float3)(64, 32, 64), convert_float3(pos)) < 4) {
+        write_imagef(T_out, pos, (float4)(1000, 0, 0, 0));
+    } else {
+        write_imagef(T_out, pos, read_imagef(T, pos));
+    }
 }
 
 void __kernel divergence(
@@ -109,7 +138,10 @@ void __kernel render(
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
-    float temp = read_imagef(T, (int4){pos.xy, 64, 0}).x;
+    float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
+    float temp = read_imagef(T, samp_f, (float4){fpos, 64, 0}).x;
     uint4 color = {temp, 0, 0, 255};
-    write_imageui(img, pos, color);
+    // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 64, 0)).xyz;
+    // uint4 color = {convert_uint3(vel*255), 255};
+    write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
 }

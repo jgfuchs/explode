@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
         sim.render(img);
         saveImage(img, i);
 
-        break;
+        // break;
     }
     sim.dumpProfiling();
 }

@@ -21,14 +21,12 @@ void Simulation::advance() {
     std::swap(U, U_tmp);
     std::swap(T, T_tmp);
 
+    reaction();
+    addForces();
+
     divergence();
     jacobi();
-    try {
-        project();
-    } catch (cl::Error err) {
-        std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
-        exit(1);
-    }
+    project();
 
     t += prms.dt;
 }
@@ -79,6 +77,8 @@ void Simulation::initOpenCL() {
     // load kernels from the program
     kInitGrid = cl::Kernel(program, "init_grid");
     kAdvect = cl::Kernel(program, "advect");
+    kAddForces = cl::Kernel(program, "add_forces");
+    kReaction = cl::Kernel(program, "reaction");
     kDivergence = cl::Kernel(program, "divergence");
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
@@ -131,6 +131,27 @@ void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
     profile(ADVECT);
 }
 
+void Simulation::addForces() {
+    kAddForces.setArg(0, prms.dt);
+    kAddForces.setArg(1, U);
+    kAddForces.setArg(2, T);
+    kAddForces.setArg(3, U_tmp);
+    queue.enqueueNDRangeKernel(kAddForces, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(ADD_FORCES);
+    std::swap(U, U_tmp);
+}
+
+void Simulation::reaction() {
+    kReaction.setArg(0, prms.dt);
+    kReaction.setArg(1, T);
+    kReaction.setArg(2, T_tmp);
+    queue.enqueueNDRangeKernel(kReaction, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(REACTION);
+    std::swap(T, T_tmp);
+}
+
 void Simulation::divergence() {
     kDivergence.setArg(0, prms.cellSize);
     kDivergence.setArg(1, U);
@@ -150,10 +171,9 @@ void Simulation::jacobi() {
     region[2] = prms.grid_d;
     queue.enqueueFillImage(P, zeros, origin, region, NULL, &event);
     event.wait();
-    profile(ZERO_P);
 
     // solve Poisson equation for pressure to ensure incompressibility
-    const int NITERATIONS = 2;
+    const int NITERATIONS = 20;
     for (int i = 0; i < NITERATIONS; i++) {
         kJacobi.setArg(0, P);
         kJacobi.setArg(1, Dvg);
@@ -161,6 +181,8 @@ void Simulation::jacobi() {
         queue.enqueueNDRangeKernel(kJacobi, cl::NullRange, gridRange, groupRange, NULL, &event);
         event.wait();
         profile(JACOBI);
+
+        std::swap(P, P_tmp);
     }
 }
 
@@ -185,22 +207,16 @@ void Simulation::dumpProfiling() {
     int sumC = 0;
     double sumT = 0, sumAvg = 0;
 
-    std::cout << "\nProfiling info\n"
-        << "Kernel\tCalls\tTime (s)\tMean (ms)\n" << std::fixed;
+    std::cout << "\nKernel\tCalls\tTime (s)\tMean (ms)\n" << std::fixed;
     for (int i = 0; i < _LAST; i++) {
         unsigned c = kernelCalls[i];
         double t = kernelTimes[i];
         double avg = (c ? (t / c) : 0.0) * 1e3;
-
-        std::cout << " [" << i << "]\t" << c;
-        if (c) {
-            std::cout << "\t" << t << "\t" << avg;
-        }
-        std::cout << "\n";
-
         sumC += c;
         sumT += t;
         sumAvg += avg;
+
+        std::cout << " [" << i << "]\t" << c << "\t" << t << "\t" << avg << "\n";
     }
     std::cout << "Total:\t" << sumC << "\t" << sumT << "\t" << sumAvg << "\n";
 }
