@@ -6,9 +6,10 @@
 \origin unavailable
 \textclass article
 \begin_preamble
-\usepackage{sectsty}
 \date{}
-\sectionfont{\normalsize}
+
+\usepackage{sectsty}
+\sectionfont{\fontsize{14}{15}\selectfont}
 \subsectionfont{\normalsize}
 \end_preamble
 \use_default_options true
@@ -17,7 +18,7 @@
 \language_package default
 \inputencoding auto
 \fontencoding global
-\font_roman "default" "default"
+\font_roman "palatino" "default"
 \font_sans "default" "default"
 \font_typewriter "default" "default"
 \font_math "auto" "auto"
@@ -89,8 +90,20 @@ Simulating Explosions on the GPU
 Julian Fuchs
 \end_layout
 
+\begin_layout Date
+MIT 6.837 (Computer Graphics), Fall 2016
+\end_layout
+
 \begin_layout Section
 Motivation
+\end_layout
+
+\begin_layout Subsection
+cool shit
+\end_layout
+
+\begin_layout Standard
+awwwwww yeah
 \end_layout
 
 \begin_layout Section

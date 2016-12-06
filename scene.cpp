@@ -29,8 +29,9 @@ Scene::Scene(char *fname) : in(fname) {
         }
     }
 
-    debugInfo();
+    // debugInfo();
 
+    // sort explosions so that popping returns earliest
     std::sort(explosions.begin(), explosions.end(),
         [](Explosion a, Explosion b) { return a.t0 > b.t0;});
 }

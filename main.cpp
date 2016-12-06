@@ -13,6 +13,13 @@ void saveImage(HostImage &img, int idx) {
     img.write(fname.str());
 }
 
+void printStatus(int i, int n, float t) {
+    static const auto spaces = std::string(80, ' ');
+    std::cout << "\r" << spaces << "\r"
+        << "Rendering: frame " << i+1 << "/" << n << ", t=" << t;
+    std::cout.flush();
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <scene>\n";
@@ -22,13 +29,16 @@ int main(int argc, char *argv[]) {
     Scene scene(argv[1]);
     Simulation sim(&scene);
 
+    std::cout << std::endl;
+
     HostImage img(scene.cam.width, scene.cam.height);
     for (int i = 0; i < scene.params.nsteps; i++) {
         sim.advance();
         sim.render(img);
         saveImage(img, i);
 
-        // break;
+        printStatus(i, scene.params.nsteps, sim.getT());
     }
+
     sim.dumpProfiling();
 }
