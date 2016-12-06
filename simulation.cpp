@@ -13,6 +13,7 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
 
     initProfiling();
     initGrid();
+    reaction();
 }
 
 void Simulation::advance() {
@@ -21,8 +22,7 @@ void Simulation::advance() {
     std::swap(U, U_tmp);
     std::swap(T, T_tmp);
 
-    reaction();
-    addForces();
+    // addForces();
 
     divergence();
     jacobi();
@@ -117,7 +117,6 @@ void Simulation::initGrid() {
     kInitGrid.setArg(2, B);
     queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
-    profile(INIT_GRID);
 }
 
 void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {

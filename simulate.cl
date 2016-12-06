@@ -18,7 +18,7 @@ void __kernel init_grid(
     __write_only image3d_t B)       // boundaries
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    write_imagef(U, pos, 0.0);
+    write_imagef(U, pos, 0);
     write_imagef(T, pos, (float4)(tAmb, 0, 0, 0));
 
     int nx = get_image_width(B),
@@ -139,9 +139,12 @@ void __kernel render(
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
-    float temp = read_imagef(T, samp_f, (float4){fpos, 64, 0}).x;
-    uint4 color = {temp, 0, 0, 255};
+
+    float temp = read_imagef(T, samp_f, (float4){fpos, 68, 0}).x;
+    uint4 color = {convert_uint(temp), 0, 0, 255};
+
     // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 64, 0)).xyz;
-    // uint4 color = {convert_uint3(vel*255), 255};
+    // uint4 color = {convert_uint3(vel*100), 255};
+
     write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
 }

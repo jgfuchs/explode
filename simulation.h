@@ -61,7 +61,7 @@ private:
     cl::Image2D target;         // render target
 
     // profiling
-    enum {INIT_GRID, ADVECT, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT, RENDER, _LAST};
+    enum {ADVECT, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;
