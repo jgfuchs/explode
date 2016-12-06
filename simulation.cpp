@@ -13,16 +13,18 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
 
     initProfiling();
     initGrid();
+
     reaction();
 }
 
 void Simulation::advance() {
+
     advect(U, U_tmp);
     advect(T, T_tmp);
     std::swap(U, U_tmp);
     std::swap(T, T_tmp);
 
-    // addForces();
+    addForces();
 
     divergence();
     jacobi();

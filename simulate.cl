@@ -58,6 +58,7 @@ void __kernel add_forces(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     float t = read_imagef(T, pos).x;
     float4 v = read_imagef(U, pos);
+
     v.y += dt * 0.5 * (t - tAmb);
     write_imagef(U_out, pos, v);
 }
@@ -68,11 +69,11 @@ void __kernel reaction(
     __write_only image3d_t T_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    if (distance((float3)(64, 32, 64), convert_float3(pos)) < 4) {
-        write_imagef(T_out, pos, (float4)(1000, 0, 0, 0));
-    } else {
-        write_imagef(T_out, pos, read_imagef(T, pos));
-    }
+
+    float4 f = read_imagef(T, pos);
+    float r = distance(convert_float3(pos), (float3)(64, 64, 64));
+    f.x += 1000 * exp(-r*r / 16);
+    write_imagef(T_out, pos, f);
 }
 
 void __kernel divergence(
@@ -140,7 +141,8 @@ void __kernel render(
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
 
-    float temp = read_imagef(T, samp_f, (float4){fpos, 68, 0}).x;
+    float temp = read_imagef(T, samp_f, (float4){fpos, 64, 0}).x;
+    temp = (temp - tAmb);
     uint4 color = {convert_uint(temp), 0, 0, 255};
 
     // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 64, 0)).xyz;
