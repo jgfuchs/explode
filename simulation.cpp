@@ -214,12 +214,28 @@ void Simulation::profile(int pk) {
     kernelCalls[pk]++;
 }
 
+template<typename T> void printr(T t, const int w=11) {
+    std::cout << std::right << std::setw(w) << t;
+}
+
+template<typename T> void printl(T t, const int w=11) {
+    std::cout << std::left << std::setw(w) << t;
+}
+
 void Simulation::dumpProfiling() {
     int sumC = 0;
     double sumT = 0;
 
-    std::cout << "\n\nProfiling info:\n" << std::setprecision(4) << std::fixed;
-    std::cout << "Kernel\tCalls\tTime (s)\tMean (ms)\n";
+    static const std::string kernelNames[_LAST] = {"advect", "addForces",
+        "curl", "reaction", "divergence", "jacobi", "project", "render"};
+
+    std::cout << "\n\nProfiling info:\n";
+    printl("Kernel");
+    printr("Calls", 8);
+    printr("Time (s)");
+    printr("Mean (ms)");
+    std::cout << std::setprecision(3) << std::fixed << std::endl;
+
     for (int i = 0; i < _LAST; i++) {
         unsigned c = kernelCalls[i];
         double t = kernelTimes[i];
@@ -227,7 +243,14 @@ void Simulation::dumpProfiling() {
         sumC += c;
         sumT += t;
 
-        std::cout << "  [" << i << "]\t" << c << "\t" << t << "\t\t" << avg << "\n";
+        printl(' ' + kernelNames[i]);
+        printr(c, 8);
+        printr(t);
+        printr(avg);
+        std::cout << std::endl;
     }
-    std::cout << "Total:\t" << sumC << "\t" << sumT << "\n";
+    printl("Total:");
+    printr(sumC, 8);
+    printr(sumT);
+    std::cout << "\n";
 }
