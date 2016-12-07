@@ -45,7 +45,7 @@ private:
     cl::CommandQueue queue;
 
     // all kernel handles
-    cl::Kernel kInitGrid, kAdvect, kAddForces, kCurl, kReaction, kDivergence,
+    cl::Kernel kInitGrid, kAdvect, kCurl, kAddForces, kReaction, kDivergence,
         kJacobi, kProject, kRender;
 
     cl::NDRange gridRange, groupRange;
@@ -63,7 +63,7 @@ private:
     cl::Image2D target;         // render target
 
     // profiling
-    enum {ADVECT, ADD_FORCES, CURL, REACTION, DIVERGENCE, JACOBI, PROJECT,
+    enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
         RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];

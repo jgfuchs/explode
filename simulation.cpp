@@ -79,8 +79,8 @@ void Simulation::initOpenCL() {
     // load kernels from the program
     kInitGrid = cl::Kernel(program, "init_grid");
     kAdvect = cl::Kernel(program, "advect");
-    kAddForces = cl::Kernel(program, "add_forces");
     kCurl = cl::Kernel(program, "curl");
+    kAddForces = cl::Kernel(program, "add_forces");
     kReaction = cl::Kernel(program, "reaction");
     kDivergence = cl::Kernel(program, "divergence");
     kJacobi = cl::Kernel(program, "jacobi");
@@ -226,8 +226,8 @@ void Simulation::dumpProfiling() {
     int sumC = 0;
     double sumT = 0;
 
-    static const std::string kernelNames[_LAST] = {"advect", "addForces",
-        "curl", "reaction", "divergence", "jacobi", "project", "render"};
+    static const std::string kernelNames[_LAST] = {"advect", "curl",
+        "addForces", "reaction", "divergence", "jacobi", "project", "render"};
 
     std::cout << "\n\nProfiling info:\n";
     printl("Kernel");
