@@ -1,5 +1,3 @@
-#include <iomanip>
-#include <random>
 #include <iostream>
 
 #include "simulation.h"
@@ -21,6 +19,7 @@ Simulation::Simulation(Scene *sc, bool prof) :
 
 void Simulation::advance() {
     addForces();
+
     project();
     advect(U, U_tmp);
     project();
@@ -148,16 +147,11 @@ void Simulation::addForces() {
     std::swap(U, U_tmp);
 }
 
-float randf() {
-    static std::mt19937 mt(1);
-    static std::uniform_real_distribution<double> dist(-1.0, +1.0);
-    return dist(mt);
-}
-
 void Simulation::reaction() {
-    cl_float2 p;
-    p.y = 8 + randf();
-    p.x = 32 + std::sin(2*t) * 18;
+    cl_float3 p;
+    p.y = 8;
+    p.x = 32 + std::cos(.8*t) * 12;
+    p.z = 32 + std::sin(.8*t) * 12;
 
     kReaction.setArg(0, prms.dt);
     kReaction.setArg(1, T);
@@ -207,14 +201,6 @@ void Simulation::profile(int pk) {
         kernelTimes[pk] += (t3 - t2) * 1e-9;
         kernelCalls[pk]++;
     }
-}
-
-template<typename T> void printr(T t, const int w=11) {
-    std::cout << std::right << std::setw(w) << t;
-}
-
-template<typename T> void printl(T t, const int w=11) {
-    std::cout << std::left << std::setw(w) << t;
 }
 
 void Simulation::dumpProfiling() {

@@ -143,12 +143,12 @@ void __kernel reaction(
     const float dt,
     __read_only image3d_t T,
     __write_only image3d_t T_out,
-    const float2 xy)
+    const float3 xy)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float4 f = read_imagef(T, pos);
-    float r = distance(convert_float3(pos), (float3)(xy.x, xy.y, 32));
+    float r = distance(convert_float3(pos), xy);
     f.x += 500 * exp(-r*r / 2);
     write_imagef(T_out, pos, f);
 }
@@ -220,11 +220,16 @@ void __kernel render(
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
 
-    float4 sp = (float4)(fpos, 32, 0);
+    float4 sp = (float4)(fpos, 1.0, 0.0);
+    float acc = 0.0f;
+    while (sp.z < 64.0f) {
+        float temp = read_imagef(T, samp_f, sp).x;
+        acc += 0.5f * (temp - tAmb) / (0.2f * sp.z);
+        sp.z += 1.0f;
+    }
 
-    float temp = read_imagef(T, samp_f, sp).x;
-    temp = (temp - tAmb);
-    uint4 color = {convert_uint3((float3)(temp)), 255};
+    // printf("%f\n", acc);
+    uint4 color = {convert_uint3((float3)(acc)), 255};
 
     // float3 vel = read_imagef(U, samp_f, sp).xyz;
     // float p = read_imagef(T, samp_f, sp).x;
