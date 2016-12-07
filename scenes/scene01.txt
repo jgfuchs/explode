@@ -1,8 +1,8 @@
 SimParam {
-    grid 128 128 128
+    grid 64 64 64
     cellSize 0.5
     dt 0.04
-    nsteps 400
+    nsteps 100
 }
 
 Camera {

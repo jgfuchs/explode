@@ -5,7 +5,8 @@
 #include "simulation.h"
 #include "clerror.h"
 
-Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
+Simulation::Simulation(Scene *sc, bool prof) :
+    scene(sc), prms(sc->params), profiling(prof), t(0.0)
 {
     try {
         initOpenCL();
@@ -44,7 +45,6 @@ void Simulation::render(HostImage &img) {
     kRender.setArg(2, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
-    event.wait();
     profile(RENDER);
 
     // read rendered image into host memory
@@ -53,8 +53,7 @@ void Simulation::render(HostImage &img) {
     region[0] = w;
     region[1] = h;
     region[2] = 1;
-    queue.enqueueReadImage(target, true, origin, region, 0, 0, img.data, NULL, &event);
-    event.wait();
+    queue.enqueueReadImage(target, true, origin, region, 0, 0, img.data);
 }
 
 void Simulation::initOpenCL() {
@@ -64,7 +63,7 @@ void Simulation::initOpenCL() {
     std::cout << "OpenCL device: " << device.getInfo<CL_DEVICE_NAME>() << "\n";
 
     context = cl::Context(device);
-    queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE);
+    queue = cl::CommandQueue(context, device, profiling ? CL_QUEUE_PROFILING_ENABLE : 0);
 
     // read & compile simulation program
     program = cl::Program(context, slurpFile("simulate.cl"));
@@ -119,8 +118,7 @@ void Simulation::initGrid() {
     kInitGrid.setArg(0, U);
     kInitGrid.setArg(1, T);
     kInitGrid.setArg(2, B);
-    queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
+    queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange);
 }
 
 void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
@@ -129,7 +127,6 @@ void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
     kAdvect.setArg(2, in);
     kAdvect.setArg(3, out);
     queue.enqueueNDRangeKernel(kAdvect, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
     profile(ADVECT);
     std::swap(in, out);
 }
@@ -139,7 +136,6 @@ void Simulation::addForces() {
     kCurl.setArg(0, U);
     kCurl.setArg(1, Curl);
     queue.enqueueNDRangeKernel(kCurl, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
     profile(CURL);
 
     kAddForces.setArg(0, prms.dt);
@@ -148,7 +144,6 @@ void Simulation::addForces() {
     kAddForces.setArg(3, Curl);
     kAddForces.setArg(4, U_tmp);
     queue.enqueueNDRangeKernel(kAddForces, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
     profile(ADD_FORCES);
     std::swap(U, U_tmp);
 }
@@ -161,15 +156,14 @@ float randf() {
 
 void Simulation::reaction() {
     cl_float2 p;
-    p.y = 24 + randf();
-    p.x = 64 + std::sin(2*t) * 24;
+    p.y = 8 + randf();
+    p.x = 32 + std::sin(2*t) * 18;
 
     kReaction.setArg(0, prms.dt);
     kReaction.setArg(1, T);
     kReaction.setArg(2, T_tmp);
     kReaction.setArg(3, p);
     queue.enqueueNDRangeKernel(kReaction, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
     profile(REACTION);
     std::swap(T, T_tmp);
 }
@@ -181,7 +175,6 @@ void Simulation::project() {
     kDivergence.setArg(1, Dvg);
     kDivergence.setArg(2, P);
     queue.enqueueNDRangeKernel(kDivergence, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
     profile(DIVERGENCE);
 
     // solve laplace(P) = div(U) for P
@@ -192,7 +185,6 @@ void Simulation::project() {
         kJacobi.setArg(1, Dvg);
         kJacobi.setArg(2, P_tmp);
         queue.enqueueNDRangeKernel(kJacobi, cl::NullRange, gridRange, groupRange, NULL, &event);
-        event.wait();
         profile(JACOBI);
         std::swap(P, P_tmp);
     }
@@ -202,16 +194,19 @@ void Simulation::project() {
     kProject.setArg(1, P);
     kProject.setArg(2, U_tmp);
     queue.enqueueNDRangeKernel(kProject, cl::NullRange, gridRange, groupRange, NULL, &event);
-    event.wait();
     profile(PROJECT);
     std::swap(U, U_tmp);
 }
 
 void Simulation::profile(int pk) {
-    cl_ulong t2 = event.getProfilingInfo<CL_PROFILING_COMMAND_START>();
-    cl_ulong t3 = event.getProfilingInfo<CL_PROFILING_COMMAND_END>();
-    kernelTimes[pk] += (t3 - t2) * 1e-9;
-    kernelCalls[pk]++;
+    if (profiling) {
+        event.wait();
+
+        cl_ulong t2 = event.getProfilingInfo<CL_PROFILING_COMMAND_START>();
+        cl_ulong t3 = event.getProfilingInfo<CL_PROFILING_COMMAND_END>();
+        kernelTimes[pk] += (t3 - t2) * 1e-9;
+        kernelCalls[pk]++;
+    }
 }
 
 template<typename T> void printr(T t, const int w=11) {
@@ -223,34 +218,35 @@ template<typename T> void printl(T t, const int w=11) {
 }
 
 void Simulation::dumpProfiling() {
-    int sumC = 0;
-    double sumT = 0;
+    if (profiling) {
+        static const std::string kernelNames[_LAST] = {"advect", "curl",
+            "addForces", "reaction", "divergence", "jacobi", "project", "render"};
 
-    static const std::string kernelNames[_LAST] = {"advect", "curl",
-        "addForces", "reaction", "divergence", "jacobi", "project", "render"};
+        std::cout << "\n\nProfiling info:\n";
+        printl("Kernel");
+        printr("Calls", 8);
+        printr("Time (s)");
+        printr("Mean (ms)");
+        std::cout << std::setprecision(3) << std::fixed << std::endl;
 
-    std::cout << "\n\nProfiling info:\n";
-    printl("Kernel");
-    printr("Calls", 8);
-    printr("Time (s)");
-    printr("Mean (ms)");
-    std::cout << std::setprecision(3) << std::fixed << std::endl;
+        int sumC = 0;
+        double sumT = 0;
+        for (int i = 0; i < _LAST; i++) {
+            unsigned c = kernelCalls[i];
+            double t = kernelTimes[i];
+            double avg = (c ? (t / c) : 0.0) * 1e3;
+            sumC += c;
+            sumT += t;
 
-    for (int i = 0; i < _LAST; i++) {
-        unsigned c = kernelCalls[i];
-        double t = kernelTimes[i];
-        double avg = (c ? (t / c) : 0.0) * 1e3;
-        sumC += c;
-        sumT += t;
-
-        printl(' ' + kernelNames[i]);
-        printr(c, 8);
-        printr(t);
-        printr(avg);
-        std::cout << std::endl;
+            printl(' ' + kernelNames[i]);
+            printr(c, 8);
+            printr(t);
+            printr(avg);
+            std::cout << std::endl;
+        }
+        printl("Total:");
+        printr(sumC, 8);
+        printr(sumT);
+        std::cout << "\n";
     }
-    printl("Total:");
-    printr(sumC, 8);
-    printr(sumT);
-    std::cout << "\n";
 }

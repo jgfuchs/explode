@@ -148,8 +148,8 @@ void __kernel reaction(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float4 f = read_imagef(T, pos);
-    float r = distance(convert_float3(pos), (float3)(xy.x, xy.y, 64));
-    f.x += 500 * exp(-r*r / 4);
+    float r = distance(convert_float3(pos), (float3)(xy.x, xy.y, 32));
+    f.x += 500 * exp(-r*r / 2);
     write_imagef(T_out, pos, f);
 }
 
@@ -220,7 +220,7 @@ void __kernel render(
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
 
-    float4 sp = (float4)(fpos, 64, 0);
+    float4 sp = (float4)(fpos, 32, 0);
 
     float temp = read_imagef(T, samp_f, sp).x;
     temp = (temp - tAmb);

@@ -11,7 +11,7 @@
 
 class Simulation {
 public:
-    Simulation(Scene *sc);
+    Simulation(Scene *sc, bool prof=true);
 
     void advance();
     float getT();
@@ -37,6 +37,7 @@ private:
 
     const Scene *scene;
     const SimParams prms;
+    bool profiling;
     float t;
 
     // OpenCL management
