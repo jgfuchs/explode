@@ -13,24 +13,22 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
 
     initProfiling();
     initGrid();
-
     reaction();
 }
 
 void Simulation::advance() {
-
-    advect(U, U_tmp);
-    advect(T, T_tmp);
-    std::swap(U, U_tmp);
-    std::swap(T, T_tmp);
-
     addForces();
-
-    divergence();
-    jacobi();
+    // project();
+    advect(U, U_tmp);
     project();
 
+    advect(T, T_tmp);
+
     t += prms.dt;
+}
+
+float Simulation::getT() {
+    return t;
 }
 
 void Simulation::render(HostImage &img) {
@@ -40,8 +38,7 @@ void Simulation::render(HostImage &img) {
     // render to target image
     kRender.setArg(0, U);
     kRender.setArg(1, T);
-    kRender.setArg(2, B);
-    kRender.setArg(3, target);
+    kRender.setArg(2, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
     event.wait();
@@ -123,13 +120,13 @@ void Simulation::initGrid() {
 
 void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
     kAdvect.setArg(0, prms.dt);
-    kAdvect.setArg(1, prms.cellSize);
-    kAdvect.setArg(2, U);
-    kAdvect.setArg(3, in);
-    kAdvect.setArg(4, out);
+    kAdvect.setArg(1, U);
+    kAdvect.setArg(2, in);
+    kAdvect.setArg(3, out);
     queue.enqueueNDRangeKernel(kAdvect, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(ADVECT);
+    std::swap(in, out);
 }
 
 void Simulation::addForces() {
@@ -153,27 +150,18 @@ void Simulation::reaction() {
     std::swap(T, T_tmp);
 }
 
-void Simulation::divergence() {
-    kDivergence.setArg(0, prms.cellSize);
-    kDivergence.setArg(1, U);
-    kDivergence.setArg(2, Dvg);
+void Simulation::project() {
+    // compute Dvg = div(U)
+    // (also zeroes out P)
+    kDivergence.setArg(0, U);
+    kDivergence.setArg(1, Dvg);
+    kDivergence.setArg(2, P);
     queue.enqueueNDRangeKernel(kDivergence, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(DIVERGENCE);
-}
 
-void Simulation::jacobi() {
-    // clear pressure to zero
-    cl_float4 zeros = {0, 0, 0, 0};
-    cl::size_t<3> origin;
-    cl::size_t<3> region;
-    region[0] = prms.grid_w;
-    region[1] = prms.grid_h;
-    region[2] = prms.grid_d;
-    queue.enqueueFillImage(P, zeros, origin, region, NULL, &event);
-    event.wait();
-
-    // solve Poisson equation for pressure to ensure incompressibility
+    // solve laplace(P) = div(U) for P
+    // this where we spend ~80% of GPU time
     const int NITERATIONS = 20;
     for (int i = 0; i < NITERATIONS; i++) {
         kJacobi.setArg(0, P);
@@ -182,19 +170,17 @@ void Simulation::jacobi() {
         queue.enqueueNDRangeKernel(kJacobi, cl::NullRange, gridRange, groupRange, NULL, &event);
         event.wait();
         profile(JACOBI);
-
         std::swap(P, P_tmp);
     }
-}
 
-void Simulation::project() {
-    kProject.setArg(0, prms.cellSize);
-    kProject.setArg(1, U);
-    kProject.setArg(2, P);
-    kProject.setArg(3, U_tmp);
+    // compute new U' = U - grad(P)
+    kProject.setArg(0, U);
+    kProject.setArg(1, P);
+    kProject.setArg(2, U_tmp);
     queue.enqueueNDRangeKernel(kProject, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(PROJECT);
+    std::swap(U, U_tmp);
 }
 
 void Simulation::profile(int pk) {
@@ -206,18 +192,18 @@ void Simulation::profile(int pk) {
 
 void Simulation::dumpProfiling() {
     int sumC = 0;
-    double sumT = 0, sumAvg = 0;
+    double sumT = 0;
 
-    std::cout << "\nKernel\tCalls\tTime (s)\tMean (ms)\n" << std::fixed;
+    std::cout << "\n\nProfiling info:\n";
+    std::cout << "Kernel\tCalls\tTime (s)\tMean (ms)\n" << std::fixed;
     for (int i = 0; i < _LAST; i++) {
         unsigned c = kernelCalls[i];
         double t = kernelTimes[i];
         double avg = (c ? (t / c) : 0.0) * 1e3;
         sumC += c;
         sumT += t;
-        sumAvg += avg;
 
-        std::cout << " [" << i << "]\t" << c << "\t" << t << "\t" << avg << "\n";
+        std::cout << "  [" << i << "]\t" << c << "\t" << t << "\t" << avg << "\n";
     }
-    std::cout << "Total:\t" << sumC << "\t" << sumT << "\t" << sumAvg << "\n";
+    std::cout << "Total:\t" << sumC << "\t" << sumT << "\n";
 }

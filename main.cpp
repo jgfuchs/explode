@@ -7,9 +7,8 @@
 #include "simulation.h"
 
 void saveImage(HostImage &img, int idx) {
-    std::ostringstream fname;
-    fname << std::setfill('0') << std::setw(4);
-    fname << "output/frame-" << idx << ".png";
+    std::stringstream fname;
+    fname << "output/frame-" << std::setfill('0') << std::setw(4) << idx << ".png";
     img.write(fname.str());
 }
 

@@ -14,6 +14,7 @@ public:
     Simulation(Scene *sc);
 
     void advance();
+    float getT();
 
     void render(HostImage &img);
 
@@ -29,8 +30,6 @@ private:
     void advect(cl::Image3D&, cl::Image3D&);
     void addForces();
     void reaction();
-    void divergence();
-    void jacobi();
     void project();
 
     // helper functions

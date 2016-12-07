@@ -10,7 +10,13 @@ __constant sampler_t samp_f =
     CLK_ADDRESS_CLAMP_TO_EDGE |
     CLK_FILTER_LINEAR;
 
-__constant float tAmb = 25;         // ambient temperature
+// physics constants
+__constant float
+    h           = 0.5,      // cell side length (m)
+    g           = -9.8,     // acceleration due to gravity (m/s^2)
+    cBuoy       = 0.15,     // buoyancy multiplier (m/Ks^2)
+    airDens     = 1.29,     // density of air  (kg/m^3)
+    tAmb        = 300;      // ambient temperature (K)
 
 void __kernel init_grid(
     __write_only image3d_t U,       // velocity
@@ -18,7 +24,7 @@ void __kernel init_grid(
     __write_only image3d_t B)       // boundaries
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    write_imagef(U, pos, 0);
+    write_imagef(U, pos, (float4)(0));
     write_imagef(T, pos, (float4)(tAmb, 0, 0, 0));
 
     int nx = get_image_width(B),
@@ -38,15 +44,17 @@ void __kernel init_grid(
 
 void __kernel advect(
     const float dt,
-    const float h,
     __read_only image3d_t U,
     __read_only image3d_t in,
     __write_only image3d_t out)
 {
-    int3 coord = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    float3 fcoord = convert_float3(coord) + 0.5f;
-    float3 pos = fcoord - dt * (1/h) * read_imagef(U, coord).xyz;
-    write_imagef(out, coord, read_imagef(in, samp_f, pos));
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+
+    float3 p = convert_float3(pos) + 0.5f;
+    float3 pback = p - dt * (1.0f / h) * read_imagef(U, pos).xyz;
+    float4 val = read_imagef(in, samp_f, pback);
+
+    write_imagef(out, pos, val);
 }
 
 void __kernel add_forces(
@@ -56,10 +64,12 @@ void __kernel add_forces(
     __write_only image3d_t U_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    float t = read_imagef(T, pos).x;
     float4 v = read_imagef(U, pos);
 
-    v.y += dt * 0.5 * (t - tAmb);
+    // add buoyancy
+    float t = read_imagef(T, pos).x;
+    v.y += dt * cBuoy * (t - tAmb);
+
     write_imagef(U_out, pos, v);
 }
 
@@ -71,15 +81,15 @@ void __kernel reaction(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float4 f = read_imagef(T, pos);
-    float r = distance(convert_float3(pos), (float3)(64, 64, 64));
-    f.x += 1000 * exp(-r*r / 16);
+    float r = distance(convert_float3(pos), (float3)(64, 16, 64));
+    f.x += 2000 * exp(-r*r / 16);
     write_imagef(T_out, pos, f);
 }
 
 void __kernel divergence(
-    const float h,
     __read_only image3d_t U,
-    __write_only image3d_t Dvg)
+    __write_only image3d_t Dvg,
+    __write_only image3d_t P)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
@@ -90,8 +100,11 @@ void __kernel divergence(
     float vz1 = read_imagef(U, samp_i, pos + (int3)(0, 0, 1)).z;
     float vz2 = read_imagef(U, samp_i, pos - (int3)(0, 0, 1)).z;
 
-    float d = ((vx1 - vx2) + (vy1 - vy2) + (vz1 - vz2)) / (2 * h);
+    float d = -0.5f * h * ((vx1 - vx2) + (vy1 - vy2) + (vz1 - vz2));
     write_imagef(Dvg, pos, d);
+
+    // avoid a call to enqueueFillImage by zeroing pressure field here
+    write_imagef(P, pos, 0);
 }
 
 void __kernel jacobi(
@@ -102,6 +115,7 @@ void __kernel jacobi(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float d = read_imagef(Dvg, pos).x;
+
     float p1 = read_imagef(P, samp_i, pos + (int3)(1, 0, 0)).x;
     float p2 = read_imagef(P, samp_i, pos - (int3)(1, 0, 0)).x;
     float p3 = read_imagef(P, samp_i, pos + (int3)(0, 1, 0)).x;
@@ -109,17 +123,17 @@ void __kernel jacobi(
     float p5 = read_imagef(P, samp_i, pos + (int3)(0, 0, 1)).x;
     float p6 = read_imagef(P, samp_i, pos - (int3)(0, 0, 1)).x;
 
-    float f = (p1 + p2 + p3 + p4 + p5 + p6 - d) / 6.0;
+    float f = (d + (p1 + p2 + p3 + p4 + p5 + p6)) / 6.0;
     write_imagef(P_out, pos, f);
 }
 
 void __kernel project(
-    const float h,
     __read_only image3d_t U,        // velocity
     __read_only image3d_t P,        // pressure
     __write_only image3d_t U_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+
     float p1 = read_imagef(P, samp_i, pos + (int3)(1, 0, 0)).x;
     float p2 = read_imagef(P, samp_i, pos - (int3)(1, 0, 0)).x;
     float p3 = read_imagef(P, samp_i, pos + (int3)(0, 1, 0)).x;
@@ -127,7 +141,7 @@ void __kernel project(
     float p5 = read_imagef(P, samp_i, pos + (int3)(0, 0, 1)).x;
     float p6 = read_imagef(P, samp_i, pos - (int3)(0, 0, 1)).x;
 
-    float3 grad = 0.5f * (1/h) * (float3)(p2 - p1, p4 - p3, p6 - p5);
+    float3 grad = 0.5f * (1.0f / h) * (float3)(p1 - p2, p3 - p4, p5 - p6);
     float3 vNew = read_imagef(U, pos).xyz - grad;
     write_imagef(U_out, pos, (float4)(vNew, 0));
 }
@@ -135,18 +149,20 @@ void __kernel project(
 void __kernel render(
     __read_only image3d_t U,
     __read_only image3d_t T,
-    __read_only image3d_t B,
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
 
-    float temp = read_imagef(T, samp_f, (float4){fpos, 64, 0}).x;
-    temp = (temp - tAmb);
-    uint4 color = {convert_uint(temp), 0, 0, 255};
+    float4 sp = (float4)(fpos, 64, 0);
 
-    // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 64, 0)).xyz;
-    // uint4 color = {convert_uint3(vel*100), 255};
+    float temp = read_imagef(T, samp_f, sp).x;
+    temp = (temp - tAmb);
+    uint4 color = {convert_uint3((float3)(temp)), 255};
+
+    // float3 vel = read_imagef(U, samp_f, sp).xyz;
+    // float p = read_imagef(T, samp_f, sp).x;
+    // uint4 color = {convert_uint(length(vel)*0), convert_uint(p*100), 0, 255};
 
     write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
 }
