@@ -19,11 +19,14 @@ __constant float
     tAmb        = 300,      // ambient temperature (K)
     vortEps     = 5.0;      // vorticity confinement coefficient
 
+__constant int3 dx = {1, 0, 0},
+                dy = {0, 1, 0},
+                dz = {0, 0, 1};
 
-inline float4 ix(image3d_t img, int i, int j, int k) {
-    return read_imagef(img, samp_i, (int3)(i, j, k));
+// lookup value at coordinate (i, j, k) in image
+inline float4 ix(image3d_t img, int3 c) {
+    return read_imagef(img, samp_i, c);
 }
-
 
 void __kernel init_grid(
     __write_only image3d_t U,       // velocity
@@ -74,7 +77,6 @@ void __kernel add_forces(
     __write_only image3d_t U_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    int i = pos.x, j = pos.y, k = pos.z;
     float4 v = read_imagef(U, pos);
 
     // buoyancy
@@ -85,13 +87,13 @@ void __kernel add_forces(
     {
         // eta = grad | curl U |
         float3 eta = {
-            ix(Curl, i+1, j, k).w - ix(Curl, i-1, j, k).w,
-            ix(Curl, i, j+1, k).w - ix(Curl, i, j-1, k).w,
-            ix(Curl, i, j, k+1).w - ix(Curl, i, j, k-1).w,
+            ix(Curl, pos + dx).w - ix(Curl, pos - dx).w,
+            ix(Curl, pos + dy).w - ix(Curl, pos - dy).w,
+            ix(Curl, pos + dz).w - ix(Curl, pos - dz).w,
         };
         eta = normalize(eta * 0.5f / h);
-        // force = eps * (|eta| x curl U) * dx
-        float3 fvort = vortEps * cross(eta, ix(Curl, i, j, k).xyz) * h;
+        // force = eps * (|eta| x curl U) * dh
+        float3 fvort = vortEps * cross(eta, ix(Curl, pos).xyz) * h;
         v.xyz += dt * fvort;
     }
 
@@ -106,12 +108,12 @@ void __kernel curl(
     int i = pos.x, j = pos.y, k = pos.z;
 
     // prefetch to avoid unecessary lookups
-    float4 x1 = ix(U, i+1, j, k);
-    float4 x2 = ix(U, i-1, j, k);
-    float4 y1 = ix(U, i, j+1, k);
-    float4 y2 = ix(U, i, j-1, k);
-    float4 z1 = ix(U, i, j, k+1);
-    float4 z2 = ix(U, i, j, k-1);
+    float4 x1 = ix(U, pos + dx);
+    float4 x2 = ix(U, pos - dx);
+    float4 y1 = ix(U, pos + dy);
+    float4 y2 = ix(U, pos - dy);
+    float4 z1 = ix(U, pos + dz);
+    float4 z2 = ix(U, pos - dz);
 
     float4 curl = {
         y1.z - y2.z - z1.y + z2.y,
@@ -136,10 +138,8 @@ void __kernel reaction(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float4 f = read_imagef(T, pos);
-
     float r = distance(convert_float3(pos), (float3)(xy.x, xy.y, 64));
     f.x += 500 * exp(-r*r / 4);
-
     write_imagef(T_out, pos, f);
 }
 
@@ -151,12 +151,12 @@ void __kernel divergence(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
-    float vx1 = read_imagef(U, samp_i, pos + (int3)(1, 0, 0)).x;
-    float vx2 = read_imagef(U, samp_i, pos - (int3)(1, 0, 0)).x;
-    float vy1 = read_imagef(U, samp_i, pos + (int3)(0, 1, 0)).y;
-    float vy2 = read_imagef(U, samp_i, pos - (int3)(0, 1, 0)).y;
-    float vz1 = read_imagef(U, samp_i, pos + (int3)(0, 0, 1)).z;
-    float vz2 = read_imagef(U, samp_i, pos - (int3)(0, 0, 1)).z;
+    float vx1 = ix(U, pos + dx).x;
+    float vx2 = ix(U, pos - dx).x;
+    float vy1 = ix(U, pos + dy).y;
+    float vy2 = ix(U, pos - dy).y;
+    float vz1 = ix(U, pos + dz).z;
+    float vz2 = ix(U, pos - dz).z;
 
     float d = -0.5f * h * ((vx1 - vx2) + (vy1 - vy2) + (vz1 - vz2));
     write_imagef(Dvg, pos, d);
@@ -175,12 +175,12 @@ void __kernel jacobi(
 
     float d = read_imagef(Dvg, pos).x;
 
-    float p1 = read_imagef(P, samp_i, pos + (int3)(1, 0, 0)).x;
-    float p2 = read_imagef(P, samp_i, pos - (int3)(1, 0, 0)).x;
-    float p3 = read_imagef(P, samp_i, pos + (int3)(0, 1, 0)).x;
-    float p4 = read_imagef(P, samp_i, pos - (int3)(0, 1, 0)).x;
-    float p5 = read_imagef(P, samp_i, pos + (int3)(0, 0, 1)).x;
-    float p6 = read_imagef(P, samp_i, pos - (int3)(0, 0, 1)).x;
+    float p1 = ix(P, pos + dx).x;
+    float p2 = ix(P, pos - dx).x;
+    float p3 = ix(P, pos + dy).x;
+    float p4 = ix(P, pos - dy).x;
+    float p5 = ix(P, pos + dz).x;
+    float p6 = ix(P, pos - dz).x;
 
     float f = (d + (p1 + p2 + p3 + p4 + p5 + p6)) / 6.0;
     write_imagef(P_out, pos, f);
@@ -194,12 +194,12 @@ void __kernel project(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
-    float p1 = read_imagef(P, samp_i, pos + (int3)(1, 0, 0)).x;
-    float p2 = read_imagef(P, samp_i, pos - (int3)(1, 0, 0)).x;
-    float p3 = read_imagef(P, samp_i, pos + (int3)(0, 1, 0)).x;
-    float p4 = read_imagef(P, samp_i, pos - (int3)(0, 1, 0)).x;
-    float p5 = read_imagef(P, samp_i, pos + (int3)(0, 0, 1)).x;
-    float p6 = read_imagef(P, samp_i, pos - (int3)(0, 0, 1)).x;
+    float p1 = ix(P, pos + dx).x;
+    float p2 = ix(P, pos - dx).x;
+    float p3 = ix(P, pos + dy).x;
+    float p4 = ix(P, pos - dy).x;
+    float p5 = ix(P, pos + dz).x;
+    float p6 = ix(P, pos - dz).x;
 
     float3 grad = 0.5f * (1.0f / h) * (float3)(p1 - p2, p3 - p4, p5 - p6);
     float3 vNew = read_imagef(U, pos).xyz - grad;
