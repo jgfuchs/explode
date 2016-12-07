@@ -44,8 +44,10 @@ private:
     cl::Context context;
     cl::CommandQueue queue;
 
-    cl::Kernel kInitGrid, kAdvect, kAddForces, kReaction, kDivergence, kJacobi,
-        kProject, kRender;
+    // all kernel handles
+    cl::Kernel kInitGrid, kAdvect, kAddForces, kCurl, kReaction, kDivergence,
+        kJacobi, kProject, kRender;
+
     cl::NDRange gridRange, groupRange;
 
     // state variables
@@ -55,12 +57,13 @@ private:
 
     // intermediates
     cl::Image3D Dvg,            // divergence
-                P, P_tmp;       // pressure
+                P, P_tmp,       // pressure
+                Curl;           // curl (with magnitude as 4th component)
 
     cl::Image2D target;         // render target
 
     // profiling
-    enum {ADVECT, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT, RENDER, _LAST};
+    enum {ADVECT, ADD_FORCES, CURL, REACTION, DIVERGENCE, JACOBI, PROJECT, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;

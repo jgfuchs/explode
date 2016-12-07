@@ -1,6 +1,9 @@
+#include <iomanip>
+#include <random>
+#include <iostream>
+
 #include "simulation.h"
 #include "clerror.h"
-#include <iomanip>
 
 Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
 {
@@ -13,15 +16,15 @@ Simulation::Simulation(Scene *sc) : scene(sc), prms(sc->params), t(0.0)
 
     initProfiling();
     initGrid();
-    reaction();
 }
 
 void Simulation::advance() {
     addForces();
-    // project();
+    project();
     advect(U, U_tmp);
     project();
 
+    reaction();
     advect(T, T_tmp);
 
     t += prms.dt;
@@ -77,6 +80,7 @@ void Simulation::initOpenCL() {
     kInitGrid = cl::Kernel(program, "init_grid");
     kAdvect = cl::Kernel(program, "advect");
     kAddForces = cl::Kernel(program, "add_forces");
+    kCurl = cl::Kernel(program, "curl");
     kReaction = cl::Kernel(program, "reaction");
     kDivergence = cl::Kernel(program, "divergence");
     kJacobi = cl::Kernel(program, "jacobi");
@@ -94,9 +98,10 @@ void Simulation::initOpenCL() {
     T_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
     B = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_UNSIGNED_INT8), w, h, d);
 
-    Dvg = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
     P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
     P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    Dvg = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    Curl = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
 
     // create render target
     target = cl::Image2D(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
@@ -130,20 +135,39 @@ void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
 }
 
 void Simulation::addForces() {
+    // compute curl for vorticity confinement
+    kCurl.setArg(0, U);
+    kCurl.setArg(1, Curl);
+    queue.enqueueNDRangeKernel(kCurl, cl::NullRange, gridRange, groupRange, NULL, &event);
+    event.wait();
+    profile(CURL);
+
     kAddForces.setArg(0, prms.dt);
     kAddForces.setArg(1, U);
     kAddForces.setArg(2, T);
-    kAddForces.setArg(3, U_tmp);
+    kAddForces.setArg(3, Curl);
+    kAddForces.setArg(4, U_tmp);
     queue.enqueueNDRangeKernel(kAddForces, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(ADD_FORCES);
     std::swap(U, U_tmp);
 }
 
+float randf() {
+    static std::mt19937 mt(1);
+    static std::uniform_real_distribution<double> dist(-1.0, +1.0);
+    return dist(mt);
+}
+
 void Simulation::reaction() {
+    cl_float2 p;
+    p.y = 24 + randf();
+    p.x = 64 + std::sin(2*t) * 24;
+
     kReaction.setArg(0, prms.dt);
     kReaction.setArg(1, T);
     kReaction.setArg(2, T_tmp);
+    kReaction.setArg(3, p);
     queue.enqueueNDRangeKernel(kReaction, cl::NullRange, gridRange, groupRange, NULL, &event);
     event.wait();
     profile(REACTION);
@@ -161,7 +185,7 @@ void Simulation::project() {
     profile(DIVERGENCE);
 
     // solve laplace(P) = div(U) for P
-    // this where we spend ~80% of GPU time
+    // this where we spend ~3/4 of GPU time
     const int NITERATIONS = 20;
     for (int i = 0; i < NITERATIONS; i++) {
         kJacobi.setArg(0, P);
@@ -194,8 +218,8 @@ void Simulation::dumpProfiling() {
     int sumC = 0;
     double sumT = 0;
 
-    std::cout << "\n\nProfiling info:\n";
-    std::cout << "Kernel\tCalls\tTime (s)\tMean (ms)\n" << std::fixed;
+    std::cout << "\n\nProfiling info:\n" << std::setprecision(4) << std::fixed;
+    std::cout << "Kernel\tCalls\tTime (s)\tMean (ms)\n";
     for (int i = 0; i < _LAST; i++) {
         unsigned c = kernelCalls[i];
         double t = kernelTimes[i];
@@ -203,7 +227,7 @@ void Simulation::dumpProfiling() {
         sumC += c;
         sumT += t;
 
-        std::cout << "  [" << i << "]\t" << c << "\t" << t << "\t" << avg << "\n";
+        std::cout << "  [" << i << "]\t" << c << "\t" << t << "\t\t" << avg << "\n";
     }
     std::cout << "Total:\t" << sumC << "\t" << sumT << "\n";
 }

@@ -16,7 +16,14 @@ __constant float
     g           = -9.8,     // acceleration due to gravity (m/s^2)
     cBuoy       = 0.15,     // buoyancy multiplier (m/Ks^2)
     airDens     = 1.29,     // density of air  (kg/m^3)
-    tAmb        = 300;      // ambient temperature (K)
+    tAmb        = 300,      // ambient temperature (K)
+    vortEps     = 5.0;      // vorticity confinement coefficient
+
+
+inline float4 ix(image3d_t img, int i, int j, int k) {
+    return read_imagef(img, samp_i, (int3)(i, j, k));
+}
+
 
 void __kernel init_grid(
     __write_only image3d_t U,       // velocity
@@ -42,6 +49,7 @@ void __kernel init_grid(
     write_imageui(B, pos, val);
 }
 
+
 void __kernel advect(
     const float dt,
     __read_only image3d_t U,
@@ -57,34 +65,84 @@ void __kernel advect(
     write_imagef(out, pos, val);
 }
 
+
 void __kernel add_forces(
     const float dt,
     __read_only image3d_t U,
     __read_only image3d_t T,
+    __read_only image3d_t Curl,
     __write_only image3d_t U_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    int i = pos.x, j = pos.y, k = pos.z;
     float4 v = read_imagef(U, pos);
 
-    // add buoyancy
-    float t = read_imagef(T, pos).x;
-    v.y += dt * cBuoy * (t - tAmb);
+    // buoyancy
+    float temp = read_imagef(T, pos).x;
+    v.y += dt * cBuoy * (temp - tAmb);
+
+    // vorticity confinement
+    {
+        // eta = grad | curl U |
+        float3 eta = {
+            ix(Curl, i+1, j, k).w - ix(Curl, i-1, j, k).w,
+            ix(Curl, i, j+1, k).w - ix(Curl, i, j-1, k).w,
+            ix(Curl, i, j, k+1).w - ix(Curl, i, j, k-1).w,
+        };
+        eta = normalize(eta * 0.5f / h);
+        // force = eps * (|eta| x curl U) * dx
+        float3 fvort = vortEps * cross(eta, ix(Curl, i, j, k).xyz) * h;
+        v.xyz += dt * fvort;
+    }
 
     write_imagef(U_out, pos, v);
 }
 
+void __kernel curl(
+    __read_only image3d_t U,
+    __write_only image3d_t Curl)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    int i = pos.x, j = pos.y, k = pos.z;
+
+    // prefetch to avoid unecessary lookups
+    float4 x1 = ix(U, i+1, j, k);
+    float4 x2 = ix(U, i-1, j, k);
+    float4 y1 = ix(U, i, j+1, k);
+    float4 y2 = ix(U, i, j-1, k);
+    float4 z1 = ix(U, i, j, k+1);
+    float4 z2 = ix(U, i, j, k-1);
+
+    float4 curl = {
+        y1.z - y2.z - z1.y + z2.y,
+        z1.x - z2.x - x1.z + x2.z,
+        x1.y - x2.y - y1.x + y2.x,
+        0
+    };
+
+    curl.xyz *= 0.5f / h;
+    curl.w = length(curl.xyz);
+
+    write_imagef(Curl, pos, curl);
+}
+
+
 void __kernel reaction(
     const float dt,
     __read_only image3d_t T,
-    __write_only image3d_t T_out)
+    __write_only image3d_t T_out,
+    const float2 xy)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float4 f = read_imagef(T, pos);
-    float r = distance(convert_float3(pos), (float3)(64, 16, 64));
-    f.x += 2000 * exp(-r*r / 16);
+
+    float r = distance(convert_float3(pos), (float3)(xy.x, xy.y, 64));
+    f.x += 500 * exp(-r*r / 4);
+
     write_imagef(T_out, pos, f);
 }
+
 
 void __kernel divergence(
     __read_only image3d_t U,
@@ -107,6 +165,7 @@ void __kernel divergence(
     write_imagef(P, pos, 0);
 }
 
+
 void __kernel jacobi(
     __read_only image3d_t P,        // pressure
     __read_only image3d_t Dvg,      // divergence
@@ -127,6 +186,7 @@ void __kernel jacobi(
     write_imagef(P_out, pos, f);
 }
 
+
 void __kernel project(
     __read_only image3d_t U,        // velocity
     __read_only image3d_t P,        // pressure
@@ -146,6 +206,7 @@ void __kernel project(
     write_imagef(U_out, pos, (float4)(vNew, 0));
 }
 
+
 void __kernel render(
     __read_only image3d_t U,
     __read_only image3d_t T,
@@ -162,7 +223,7 @@ void __kernel render(
 
     // float3 vel = read_imagef(U, samp_f, sp).xyz;
     // float p = read_imagef(T, samp_f, sp).x;
-    // uint4 color = {convert_uint(length(vel)*0), convert_uint(p*100), 0, 255};
+    // uint4 color = {convert_uint3(vel*10), 255};
 
     write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
 }

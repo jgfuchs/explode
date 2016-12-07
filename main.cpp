@@ -14,8 +14,14 @@ void saveImage(HostImage &img, int idx) {
 
 void printStatus(int i, int n, float t) {
     static const auto spaces = std::string(80, ' ');
+    static bool first = true;
+    if (first) {
+        std::cout << std::endl << std::setprecision(2) << std::fixed;
+        first = false;
+    }
+
     std::cout << "\r" << spaces << "\r"
-        << "Rendering: frame " << i+1 << "/" << n << ", t=" << t;
+        << "Simulating: frame " << i+1 << "/" << n << ", t=" << t << "   ";
     std::cout.flush();
 }
 
@@ -27,8 +33,6 @@ int main(int argc, char *argv[]) {
 
     Scene scene(argv[1]);
     Simulation sim(&scene);
-
-    std::cout << std::endl;
 
     HostImage img(scene.cam.width, scene.cam.height);
     for (int i = 0; i < scene.params.nsteps; i++) {

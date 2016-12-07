@@ -1,2 +1,3 @@
 #!/usr/bin/bash
-rm *.png *.mp4
+rm *.png
+echo Removed output PNGs

@@ -1,4 +1,4 @@
 build
-writeup/*~
-output/*.png
-output/*.mp4
+*~
+*.png
+*.mp4
