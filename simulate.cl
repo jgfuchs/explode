@@ -13,10 +13,12 @@ __constant sampler_t samp_f =
 // physics constants
 __constant float
     h           = 0.5,      // cell side length (m)
-    grav        = 9.8,     // acceleration due to gravity (m/s^2)
+    grav        = 9.8,      // acceleration due to gravity (m/s^2)
     cBuoy       = 0.15,     // buoyancy multiplier (m/Ks^2)
     airDens     = 1.29,     // density of air  (kg/m^3)
     tAmb        = 300,      // ambient temperature (K)
+    tMax        = 4000,     // maximum temperature (K)
+    cCooling    = 2000,     // cooling factor (K/s)
     vortEps     = 5.0;      // vorticity confinement coefficient
 
 __constant int3 dx = {1, 0, 0},
@@ -146,10 +148,16 @@ void __kernel reaction(
     const float3 xy)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-
     float4 f = read_imagef(T, pos);
-    float r = distance(convert_float3(pos), xy);
-    f.x += 500 * exp(-r*r / 2);
+
+    // cooling (cheaper than real heat diffusion)
+    float r  = (f.x - tAmb) / (tMax - tAmb);
+    f.x -= cCooling * pown(r, 4);
+
+    // heat source
+    r = distance(convert_float3(pos), xy);
+    f.x += 500 * exp(-r*r / 4);
+
     write_imagef(T_out, pos, f);
 }
 
@@ -228,7 +236,6 @@ void __kernel render(
         sp.z += 1.0f;
     }
 
-    // printf("%f\n", acc);
     uint4 color = {convert_uint3((float3)(acc)), 255};
 
     // float3 vel = read_imagef(U, samp_f, sp).xyz;

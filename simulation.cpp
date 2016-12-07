@@ -18,12 +18,13 @@ Simulation::Simulation(Scene *sc, bool prof) :
 }
 
 void Simulation::advance() {
+    // fluid flow
     addForces();
-
     project();
     advect(U, U_tmp);
     project();
 
+    // fire & dangerous things
     reaction();
     advect(T, T_tmp);
 
@@ -149,9 +150,9 @@ void Simulation::addForces() {
 
 void Simulation::reaction() {
     cl_float3 p;
-    p.y = 8;
-    p.x = 32 + std::cos(.8*t) * 12;
-    p.z = 32 + std::sin(.8*t) * 12;
+    p.y = 8 + randf();
+    p.x = 32 + randf(); //std::cos(.8*t) * 12;
+    p.z = 32 + randf(); //std::sin(.8*t) * 12;
 
     kReaction.setArg(0, prms.dt);
     kReaction.setArg(1, T);

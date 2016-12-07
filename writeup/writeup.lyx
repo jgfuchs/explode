@@ -83,7 +83,7 @@
 \begin_body
 
 \begin_layout Title
-Simulating Explosions on the GPU
+Animating Explosions on the GPU
 \end_layout
 
 \begin_layout Author
@@ -98,20 +98,16 @@ MIT 6.837 (Computer Graphics), Fall 2016
 Motivation
 \end_layout
 
-\begin_layout Subsection
-cool shit
-\end_layout
-
-\begin_layout Standard
-awwwwww yeah
-\end_layout
-
 \begin_layout Section
 Background
 \end_layout
 
 \begin_layout Section
-Implementation
+Simulating
+\end_layout
+
+\begin_layout Section
+Rendering
 \end_layout
 
 \begin_layout Section
