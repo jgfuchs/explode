@@ -35,6 +35,7 @@ private:
     void setBounds(cl::Image3D &in, cl::Image3D &out);
 
     // helper functions
+    void enqueueGrid(cl::Kernel k);
     void profile(int pk);
 
     const Scene *scene;

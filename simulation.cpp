@@ -92,8 +92,6 @@ void Simulation::initOpenCL() {
     kRender = cl::Kernel(program, "render");
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
-    gridRange = cl::NDRange(w, h, d);
-    groupRange = cl::NDRange(8, 8, 8);
 
     // create buffers
     U = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
@@ -124,7 +122,7 @@ void Simulation::initGrid() {
     kInitGrid.setArg(0, U);
     kInitGrid.setArg(1, T);
     kInitGrid.setArg(2, B);
-    queue.enqueueNDRangeKernel(kInitGrid, cl::NullRange, gridRange, groupRange);
+    enqueueGrid(kInitGrid);
 }
 
 void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
@@ -132,7 +130,7 @@ void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
     kAdvect.setArg(1, U);
     kAdvect.setArg(2, in);
     kAdvect.setArg(3, out);
-    queue.enqueueNDRangeKernel(kAdvect, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kAdvect);
     profile(ADVECT);
     std::swap(in, out);
 }
@@ -141,7 +139,7 @@ void Simulation::addForces() {
     // compute curl for vorticity confinement
     kCurl.setArg(0, U);
     kCurl.setArg(1, Curl);
-    queue.enqueueNDRangeKernel(kCurl, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kCurl);
     profile(CURL);
 
     kAddForces.setArg(0, prms.dt);
@@ -149,7 +147,7 @@ void Simulation::addForces() {
     kAddForces.setArg(2, T);
     kAddForces.setArg(3, Curl);
     kAddForces.setArg(4, U_tmp);
-    queue.enqueueNDRangeKernel(kAddForces, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kAddForces);
     profile(ADD_FORCES);
     std::swap(U, U_tmp);
 }
@@ -164,7 +162,7 @@ void Simulation::reaction() {
     kReaction.setArg(1, T);
     kReaction.setArg(2, T_tmp);
     kReaction.setArg(3, p);
-    queue.enqueueNDRangeKernel(kReaction, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kReaction);
     profile(REACTION);
     std::swap(T, T_tmp);
 }
@@ -175,7 +173,7 @@ void Simulation::project() {
     kDivergence.setArg(0, U);
     kDivergence.setArg(1, Dvg);
     kDivergence.setArg(2, P);
-    queue.enqueueNDRangeKernel(kDivergence, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kDivergence);
     profile(DIVERGENCE);
     setBounds(Dvg, Dvg_tmp);
 
@@ -186,7 +184,7 @@ void Simulation::project() {
         kJacobi.setArg(0, P);
         kJacobi.setArg(1, Dvg);
         kJacobi.setArg(2, P_tmp);
-        queue.enqueueNDRangeKernel(kJacobi, cl::NullRange, gridRange, groupRange, NULL, &event);
+        enqueueGrid(kJacobi);
         profile(JACOBI);
         std::swap(P, P_tmp);
         setBounds(P, P_tmp);
@@ -196,7 +194,7 @@ void Simulation::project() {
     kProject.setArg(0, U);
     kProject.setArg(1, P);
     kProject.setArg(2, U_tmp);
-    queue.enqueueNDRangeKernel(kProject, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kProject);
     profile(PROJECT);
     std::swap(U, U_tmp);
     setVelBounds();
@@ -206,7 +204,7 @@ void Simulation::setVelBounds() {
     kVelBounds.setArg(0, B);
     kVelBounds.setArg(1, U);
     kVelBounds.setArg(2, U_tmp);
-    queue.enqueueNDRangeKernel(kVelBounds, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kVelBounds);
     profile(VEL_BOUNDS);
     std::swap(U, U_tmp);
 }
@@ -215,9 +213,17 @@ void Simulation::setBounds(cl::Image3D &in, cl::Image3D &out) {
     kSetBounds.setArg(0, B);
     kSetBounds.setArg(1, in);
     kSetBounds.setArg(2, out);
-    queue.enqueueNDRangeKernel(kSetBounds, cl::NullRange, gridRange, groupRange, NULL, &event);
+    enqueueGrid(kSetBounds);
     profile(SET_BOUNDS);
     std::swap(in, out);
+}
+
+inline void Simulation::enqueueGrid(cl::Kernel k) {
+    queue.enqueueNDRangeKernel(k,
+        cl::NullRange,
+        cl::NDRange(prms.grid_w, prms.grid_h, prms.grid_w),
+        cl::NDRange(8, 8, 8),
+        NULL, &event);
 }
 
 void Simulation::profile(int pk) {

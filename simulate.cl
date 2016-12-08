@@ -272,24 +272,18 @@ void __kernel render(
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
+
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
+    float4 sp = (float4)(fpos, 0.5, 0.0);
 
-    float4 sp = (float4)(fpos, 32.0, 0.0);
-    // float acc = 0.0f;
-    // while (sp.z < 64.0f) {
-        // float s = read_imagef(T, samp_f, sp).y;
-    //     acc += 5 * s;
-    //     sp.z += 1.0f;
-    // }
-
-    int bnd = read_imageui(B, samp_i, sp).x;
-    uint4 color = {0, 0, 0, 255};
-    if (bnd == 0) {
+    float acc = 0.0f;
+    while (sp.z < 64.0f) {
         float s = read_imagef(T, samp_f, sp).y;
-        color.xyz = convert_uint3((float3)(s*20));
-    } else if (bnd == 1) {
-        color.xyz = (uint3)(32, 32, 128);
+        acc += s;
+        sp.z += 0.5f;
     }
+    
+    uint4 color = {convert_uint3((float3)(acc)), 255};
 
     // float3 vel = read_imagef(U, samp_f, sp).xyz;
     // uint4 color = {convert_uint3(vel*7), 255};
