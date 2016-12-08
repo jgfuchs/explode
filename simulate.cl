@@ -14,12 +14,13 @@ __constant sampler_t samp_f =
 __constant float
     h           = 0.5,      // cell side length (m)
     grav        = 9.8,      // acceleration due to gravity (m/s^2)
-    cBuoy       = 0.15,     // buoyancy multiplier (m/Ks^2)
+    cBuoy       = 0.10,     // buoyancy multiplier (m/Ks^2)
+    cSink       = 0.35,     // smoke sinking
     airDens     = 1.29,     // density of air  (kg/m^3)
     tAmb        = 300,      // ambient temperature (K)
     tMax        = 4000,     // maximum temperature (K)
     cCooling    = 2000,     // cooling factor (K/s)
-    vortEps     = 5.0;      // vorticity confinement coefficient
+    vortEps     = 4.0;      // vorticity confinement coefficient
 
 __constant int3 dx = {1, 0, 0},
                 dy = {0, 1, 0},
@@ -44,11 +45,11 @@ void __kernel init_grid(
         nz = get_image_depth(B);
 
     uint val;
-    if (pos.x < 1 || pos.x > nx-1 || pos.z < 1 || pos.z > nz-1 || pos.y > ny-1) {
-        val = 1;    // walls & ceiling are open
-    } else if (pos.y < 1) {
-        val = 2;    // floor is solid
-    } else {
+    if (pos.x == 0 || pos.x == nx-1 || pos.z == 0 || pos.z == nz-1 || pos.y == 0 || pos.y == ny-1) {
+        val = 1;    // walls (incl. floor & ceiling) are solid
+    }/* else if (5 > distance(convert_float3(pos), (float3)(32, 40, 32))) {
+        val = 2;
+    } */else {
         val = 0;    // fluid everywhere else
     }
     write_imageui(B, pos, val);
@@ -114,12 +115,10 @@ void __kernel add_forces(
     float3 f = 0;
 
     // buoyancy - hot air rises
-    float temp = therm.x;
-    f.y += cBuoy * (temp - tAmb);
+    f.y += cBuoy * (therm.x - tAmb);
 
     // smoke sinks
-    float smoke = therm.y;
-    f.y += smoke / (smoke + airDens) * grav;
+    f.y -= cSink * therm.y * grav;
 
     // vorticity confinement
     {
@@ -154,9 +153,10 @@ void __kernel reaction(
     float r  = (f.x - tAmb) / (tMax - tAmb);
     f.x -= cCooling * pown(r, 4);
 
-    // heat source
+    // heat & smoke source
     r = distance(convert_float3(pos), xy);
-    f.x += 500 * exp(-r*r / 4);
+    f.x += 500 * exp(-r*r / 6);
+    f.y += 5 * exp(-r*r / 6);
 
     write_imagef(T_out, pos, f);
 }
@@ -186,17 +186,9 @@ void __kernel jacobi(
     __write_only image3d_t P_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-
-    float d = read_imagef(Dvg, pos).x;
-
-    float p1 = ix(P, pos + dx).x;
-    float p2 = ix(P, pos - dx).x;
-    float p3 = ix(P, pos + dy).x;
-    float p4 = ix(P, pos - dy).x;
-    float p5 = ix(P, pos + dz).x;
-    float p6 = ix(P, pos - dz).x;
-
-    float f = (d + (p1 + p2 + p3 + p4 + p5 + p6)) / 6.0;
+    float f = ((ix(P, pos + dx).x + ix(P, pos - dx).x
+              + ix(P, pos + dy).x + ix(P, pos - dy).x
+              + ix(P, pos + dz).x + ix(P, pos - dz).x) + ix(Dvg, pos).x) / 6.0;
     write_imagef(P_out, pos, f);
 }
 
@@ -220,27 +212,87 @@ void __kernel project(
 }
 
 
+
+void __kernel set_vel_bounds(
+    __read_only image3d_t B,
+    __read_only image3d_t U,
+    __write_only image3d_t U_out)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    float4 v = ix(U, pos);
+
+    int b = read_imageui(B, pos).x;
+    if (b == 1) {
+        int nx = get_image_width(B),
+            ny = get_image_height(B),
+            nz = get_image_depth(B);
+
+        if (pos.x == 0)         { v = ix(U, pos + dx); v.x *= -1; }
+        else if (pos.x == nx-1) { v = ix(U, pos - dx); v.x *= -1; }
+        else if (pos.y == 0)    { v = ix(U, pos + dy); v.y *= -1; }
+        else if (pos.y == ny-1) { v = ix(U, pos - dy); v.y *= -1; }
+        else if (pos.z == 0)    { v = ix(U, pos + dz); v.z *= -1; }
+        else if (pos.z == nz-1) { v = ix(U, pos - dz); v.z *= -1; }
+    }
+
+    write_imagef(U_out, pos, v);
+}
+
+
+void __kernel set_bounds(
+    __read_only image3d_t B,
+    __read_only image3d_t in,
+    __write_only image3d_t out)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    float4 f = ix(in, pos);
+
+    int b = read_imageui(B, pos).x;
+    if (b == 1) {
+        int nx = get_image_width(B),
+            ny = get_image_height(B),
+            nz = get_image_depth(B);
+
+        if (pos.x == 0)         f = ix(in, pos + dx);
+        else if (pos.x == nx-1) f = ix(in, pos - dx);
+        else if (pos.y == 0)    f = ix(in, pos + dy);
+        else if (pos.y == ny-1) f = ix(in, pos - dy);
+        else if (pos.z == 0)    f = ix(in, pos + dz);
+        else if (pos.z == nz-1) f = ix(in, pos - dz);
+    }
+
+    write_imagef(out, pos, f);
+}
+
+
 void __kernel render(
     __read_only image3d_t U,
     __read_only image3d_t T,
+    __read_only image3d_t B,
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
 
-    float4 sp = (float4)(fpos, 1.0, 0.0);
-    float acc = 0.0f;
-    while (sp.z < 64.0f) {
-        float temp = read_imagef(T, samp_f, sp).x;
-        acc += 0.5f * (temp - tAmb) / (0.2f * sp.z);
-        sp.z += 1.0f;
+    float4 sp = (float4)(fpos, 32.0, 0.0);
+    // float acc = 0.0f;
+    // while (sp.z < 64.0f) {
+        // float s = read_imagef(T, samp_f, sp).y;
+    //     acc += 5 * s;
+    //     sp.z += 1.0f;
+    // }
+
+    int bnd = read_imageui(B, samp_i, sp).x;
+    uint4 color = {0, 0, 0, 255};
+    if (bnd == 0) {
+        float s = read_imagef(T, samp_f, sp).y;
+        color.xyz = convert_uint3((float3)(s*20));
+    } else if (bnd == 1) {
+        color.xyz = (uint3)(32, 32, 128);
     }
 
-    uint4 color = {convert_uint3((float3)(acc)), 255};
-
     // float3 vel = read_imagef(U, samp_f, sp).xyz;
-    // float p = read_imagef(T, samp_f, sp).x;
-    // uint4 color = {convert_uint3(vel*10), 255};
+    // uint4 color = {convert_uint3(vel*7), 255};
 
     write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
 }

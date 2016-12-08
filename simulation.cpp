@@ -22,11 +22,13 @@ void Simulation::advance() {
     addForces();
     project();
     advect(U, U_tmp);
+    setVelBounds();
     project();
 
     // fire & dangerous things
     reaction();
     advect(T, T_tmp);
+    setBounds(T, T_tmp);
 
     t += prms.dt;
 }
@@ -42,7 +44,8 @@ void Simulation::render(HostImage &img) {
     // render to target image
     kRender.setArg(0, U);
     kRender.setArg(1, T);
-    kRender.setArg(2, target);
+    kRender.setArg(2, B);
+    kRender.setArg(3, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
     profile(RENDER);
@@ -84,6 +87,8 @@ void Simulation::initOpenCL() {
     kDivergence = cl::Kernel(program, "divergence");
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
+    kVelBounds = cl::Kernel(program, "set_vel_bounds");
+    kSetBounds = cl::Kernel(program, "set_bounds");
     kRender = cl::Kernel(program, "render");
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
@@ -100,6 +105,7 @@ void Simulation::initOpenCL() {
     P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
     P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
     Dvg = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
+    Dvg_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
     Curl = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
 
     // create render target
@@ -150,9 +156,9 @@ void Simulation::addForces() {
 
 void Simulation::reaction() {
     cl_float3 p;
-    p.y = 8 + randf();
-    p.x = 32 + randf(); //std::cos(.8*t) * 12;
-    p.z = 32 + randf(); //std::sin(.8*t) * 12;
+    p.y = 8 + randf()*0.5;
+    p.x = 32 + std::sin(2*t) * 2;
+    p.z = 32; //std::sin(.8*t) * 12;
 
     kReaction.setArg(0, prms.dt);
     kReaction.setArg(1, T);
@@ -171,6 +177,7 @@ void Simulation::project() {
     kDivergence.setArg(2, P);
     queue.enqueueNDRangeKernel(kDivergence, cl::NullRange, gridRange, groupRange, NULL, &event);
     profile(DIVERGENCE);
+    setBounds(Dvg, Dvg_tmp);
 
     // solve laplace(P) = div(U) for P
     // this where we spend ~3/4 of GPU time
@@ -182,6 +189,7 @@ void Simulation::project() {
         queue.enqueueNDRangeKernel(kJacobi, cl::NullRange, gridRange, groupRange, NULL, &event);
         profile(JACOBI);
         std::swap(P, P_tmp);
+        setBounds(P, P_tmp);
     }
 
     // compute new U' = U - grad(P)
@@ -191,6 +199,25 @@ void Simulation::project() {
     queue.enqueueNDRangeKernel(kProject, cl::NullRange, gridRange, groupRange, NULL, &event);
     profile(PROJECT);
     std::swap(U, U_tmp);
+    setVelBounds();
+}
+
+void Simulation::setVelBounds() {
+    kVelBounds.setArg(0, B);
+    kVelBounds.setArg(1, U);
+    kVelBounds.setArg(2, U_tmp);
+    queue.enqueueNDRangeKernel(kVelBounds, cl::NullRange, gridRange, groupRange, NULL, &event);
+    profile(VEL_BOUNDS);
+    std::swap(U, U_tmp);
+}
+
+void Simulation::setBounds(cl::Image3D &in, cl::Image3D &out) {
+    kSetBounds.setArg(0, B);
+    kSetBounds.setArg(1, in);
+    kSetBounds.setArg(2, out);
+    queue.enqueueNDRangeKernel(kSetBounds, cl::NullRange, gridRange, groupRange, NULL, &event);
+    profile(SET_BOUNDS);
+    std::swap(in, out);
 }
 
 void Simulation::profile(int pk) {
@@ -206,8 +233,10 @@ void Simulation::profile(int pk) {
 
 void Simulation::dumpProfiling() {
     if (profiling) {
-        static const std::string kernelNames[_LAST] = {"advect", "curl",
-            "addForces", "reaction", "divergence", "jacobi", "project", "render"};
+
+        static const std::string kernelNames[_LAST] = { "advect", "curl",
+            "addForces", "reaction", "divergence", "jacobi", "project",
+            "velBounds", "setBounds", "render"};
 
         std::cout << "\n\nProfiling info:\n";
         printl("Kernel");

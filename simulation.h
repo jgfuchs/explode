@@ -31,6 +31,8 @@ private:
     void addForces();
     void reaction();
     void project();
+    void setVelBounds();
+    void setBounds(cl::Image3D &in, cl::Image3D &out);
 
     // helper functions
     void profile(int pk);
@@ -47,7 +49,7 @@ private:
 
     // all kernel handles
     cl::Kernel kInitGrid, kAdvect, kCurl, kAddForces, kReaction, kDivergence,
-        kJacobi, kProject, kRender;
+        kJacobi, kProject, kVelBounds, kSetBounds, kRender;
 
     cl::NDRange gridRange, groupRange;
 
@@ -57,7 +59,7 @@ private:
                 B;              // boundaries
 
     // intermediates
-    cl::Image3D Dvg,            // divergence
+    cl::Image3D Dvg, Dvg_tmp,   // divergence
                 P, P_tmp,       // pressure
                 Curl;           // curl (with magnitude as 4th component)
 
@@ -65,7 +67,7 @@ private:
 
     // profiling
     enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
-        RENDER, _LAST};
+        VEL_BOUNDS, SET_BOUNDS, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;
