@@ -28,7 +28,7 @@ struct Camera {
 
     cl_float3 pos, center, up;
     cl_uint width, height;
-    cl_float _1, _2;
+    cl_float _1, _2;        // padding
 } __attribute__ ((packed));
 
 struct Light {
@@ -36,7 +36,7 @@ struct Light {
 
     cl_float3 pos;
     cl_float intensity;
-    cl_float _1, _2, _3;
+    cl_float _1, _2, _3;    // padding
 } __attribute__ ((packed));
 
 struct Explosion {
