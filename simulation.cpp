@@ -19,6 +19,8 @@ Simulation::Simulation(Scene *sc, bool prof) :
 
 void Simulation::advance() {
     // fluid flow
+    setBounds();
+
     addForces();
     project();
     advect();
@@ -43,7 +45,7 @@ void Simulation::render(HostImage &img) {
     kRender.setArg(1, scene->light);
     kRender.setArg(2, U);
     kRender.setArg(3, T);
-    kRender.setArg(4, P);
+    kRender.setArg(4, B);
     kRender.setArg(5, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
@@ -117,10 +119,18 @@ void Simulation::initProfiling() {
 }
 
 void Simulation::initGrid() {
-    kInitGrid.setArg(0, U);
-    kInitGrid.setArg(1, T);
-    kInitGrid.setArg(2, B);
+    cl_uint nobjs = scene->objects.size();
+    auto objs = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+        sizeof(Object) * nobjs, (void *)scene->objects.data());
+
+    kInitGrid.setArg(0, prms.walls);
+    kInitGrid.setArg(1, nobjs);
+    kInitGrid.setArg(2, objs);
+    kInitGrid.setArg(3, U);
+    kInitGrid.setArg(4, T);
+    kInitGrid.setArg(5, B);
     enqueueGrid(kInitGrid);
+    profile(INIT_GRID);
 }
 
 void Simulation::advect() {
@@ -182,7 +192,6 @@ void Simulation::project() {
     kDivergence.setArg(2, P);
     enqueueGrid(kDivergence);
     profile(DIVERGENCE);
-    setBounds(Dvg, Dvg_tmp);
 
     // solve laplace(P) = div(U) for P
     // this where we spend ~3/4 of GPU time
@@ -194,7 +203,6 @@ void Simulation::project() {
         enqueueGrid(kJacobi);
         profile(JACOBI);
         std::swap(P, P_tmp);
-        setBounds(P, P_tmp);
     }
 
     // compute new U' = U - grad(P)
@@ -206,19 +214,22 @@ void Simulation::project() {
     std::swap(U, U_tmp);
 }
 
-void Simulation::setBounds(cl::Image3D &in, cl::Image3D &out) {
-    return;
+void Simulation::setBounds() {
     kSetBounds.setArg(0, B);
-    kSetBounds.setArg(1, in);
-    kSetBounds.setArg(2, out);
+    kSetBounds.setArg(1, U);
+    kSetBounds.setArg(2, T);
+    kSetBounds.setArg(3, U_tmp);
+    kSetBounds.setArg(4, T_tmp);
     enqueueGrid(kSetBounds);
     profile(SET_BOUNDS);
-    std::swap(in, out);
+
+    std::swap(U, U_tmp);
+    std::swap(T, T_tmp);
 }
 
 inline void Simulation::enqueueGrid(cl::Kernel kernel) {
     queue.enqueueNDRangeKernel(kernel,
-        cl::NullRange,          // offset
+        cl::NullRange,          // 0 offset
         cl::NDRange(prms.grid_w, prms.grid_h, prms.grid_w), // global size
         cl::NDRange(8, 8, 8),   // local (workgroup) size
         NULL, &event);
@@ -238,8 +249,9 @@ void Simulation::profile(int pk) {
 void Simulation::dumpProfiling() {
     std::cout << "\n";
     if (profiling) {
-        static const std::string kernelNames[_LAST] = { "advect", "curl",
-            "addForces", "reaction", "divergence", "jacobi", "project",
+
+        static const std::string kernelNames[_LAST] = { "initGrid", "advect",
+            "curl", "addForces", "reaction", "divergence", "jacobi", "project",
             "setBounds", "render"};
 
         std::cout << "\n\nProfiling info:\n";

@@ -17,21 +17,19 @@ Scene::Scene(char *fname) : in(fname) {
             parseSimParams();
         } else if (tok == "Camera") {
             parseCamera();
-        } else if (tok == "Object") {
-            parseObject();
         } else if (tok == "Explosion") {
             parseExplosion();
         } else if (tok == "Light") {
             parseLight();
+        } else if (tok == "Object") {
+            parseObject();
         } else if (tok == "") {
-            // do nothing, not sure why this happens
+            // do nothing, not sure why this ever occurs
         } else {
             std::cerr << "Error: unexpected token '" << tok << "'\n";
             exit(1);
         }
     }
-
-    // debugInfo();
 
     // sort explosions so that popping returns earliest
     std::sort(explosions.begin(), explosions.end(),
@@ -39,14 +37,6 @@ Scene::Scene(char *fname) : in(fname) {
 }
 
 void Scene::parseSimParams() {
-    static bool done = false;
-    if (done) {
-        std::cerr << "Error: multiple SimParam defined\n";
-        exit(1);
-    } else {
-        done = true;
-    }
-
     expect("{");
     while (true) {
         auto tok = getToken();
@@ -65,6 +55,8 @@ void Scene::parseSimParams() {
             params.dt = getFloat();
         } else if (tok == "nsteps") {
             params.nsteps = getInt();
+        } else if (tok == "walls") {
+            params.walls = getInt();
         } else if (tok == "}") {
             break;
         } else {
@@ -117,12 +109,6 @@ void Scene::parseLight() {
     }
 }
 
-void Scene::parseObject() {
-    expect("{");
-
-    expect("}");
-}
-
 void Scene::parseExplosion() {
     Explosion ex;
     expect("{");
@@ -146,6 +132,29 @@ void Scene::parseExplosion() {
     //     exit(1);
     // }
     explosions.push_back(ex);
+}
+
+void Scene::parseObject() {
+    Object obj;
+    expect("{");
+    while (true) {
+        auto tok = getToken();
+        if (tok == "pos") {
+            obj.pos = getFloat3();
+        } else if (tok == "dims") {
+            obj.dims = getFloat3();
+        } else if (tok == "}") {
+            break;
+        } else {
+            std::cerr << "Error: unexpected token '" << tok << "' in Object\n";
+            exit(1);
+        }
+    }
+    // half-dimensions more useful
+    obj.dims.x *= 0.5;
+    obj.dims.y *= 0.5;
+    obj.dims.z *= 0.5;
+    objects.push_back(obj);
 }
 
 std::string Scene::getToken() {
@@ -196,44 +205,4 @@ cl_float3 Scene::getFloat3() {
           f2 = getFloat(),
           f3 = getFloat();
     return {f1, f2, f3};
-}
-
-
-inline std::ostream &
-operator<<(std::ostream &os, const cl_float3 &h)
-{
-    os << "(" << h.x << ", " << h.y << ", " << h.z << ")";
-    return os;
-}
-
-void Scene::debugInfo() {
-    std::cout << "Params: "
-        << "grid=(" << params.grid_w << ", " << params.grid_h << ", " << params.grid_d << ") "
-        << "steps=" << params.nsteps << " "
-        << "dt=" << params.dt << "\n";
-
-    std::cout << "Camera: "
-        << "pos=" << cam.pos << " "
-        << "center=" << cam.center << " "
-        << "up=" << cam.up << " "
-        << "size=(" << cam.width << ", " << cam.height << ")" << "\n";
-
-    std::cout << "light: "
-        << "pos=" << light.pos << " "
-        << "intensity=" << light.intensity << "\n";
-
-    std::cout << "Explosions:\n";
-    for (unsigned i = 0; i < explosions.size(); i++) {
-        auto ex = explosions[i];
-        std::cout << "  [" << i << "]  "
-            << "pos=" << ex.pos << " "
-            << "size=" << ex.size << " "
-            << "t0=" << ex.t0 << "\n";
-    }
-
-    // std::cout << "Objects:\n";
-    // for (unsigned i = 0; i < objects.size(); i++) {
-        // auto obj = objects[i];
-    // }
-    std::cout << std::endl;
 }

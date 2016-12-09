@@ -31,15 +31,14 @@ private:
     void addForces();
     void reaction();
     void project();
-    void setVelBounds();
-    void setBounds(cl::Image3D &in, cl::Image3D &out);
+    void setBounds();
 
     // helper functions
     void enqueueGrid(cl::Kernel k);
     void profile(int pk);
 
     const Scene *scene;
-    const SimParams prms;
+    const SimParams prms;   // slightly more convenient access
     bool profiling;
     float t;
 
@@ -67,7 +66,7 @@ private:
     cl::Image2D target;         // render target
 
     // profiling
-    enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
+    enum {INIT_GRID, ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
         SET_BOUNDS, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];

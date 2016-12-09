@@ -19,15 +19,18 @@ void __kernel render(
     // }
     // uint4 color = {convert_uint3((float3)(acc)), 255};
 
+    /* DEBUG: temp & smoke */
     float4 sp = (float4)(fpos, 32, 0);
+    uint b = read_imageui(B, samp_f, sp).x;
     float3 t = read_imagef(T, samp_f, sp).xyz;
     uint4 color = {convert_uint3((float3)(t.y*60)), 255};
+    if (b) {
+        color.xyz = (uint3)(255, 128, 0);
+    }
+
     // uint4 color = {convert_uint3((float3)((t.x-tAmb)*0.4)), 255};
 
-    // float4 sp = (float4)(fpos, 32, 0);
-    // float p = read_imagef(B, samp_f, sp).x;
-    // uint4 color = {convert_uint3((float3)(p)*60), 255};
-
+    /* DEBUG: velocity */
     // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 32, 0)).xyz;
     // uint4 color = {convert_uint3((float3)(fabs(vel*10))), 255};
 

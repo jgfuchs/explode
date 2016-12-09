@@ -9,6 +9,16 @@ struct Light {
     float intensity;
 };
 
+struct Explosion {
+    float3 pos;
+    float size, t0;
+};
+
+struct Object {
+    float3 pos;
+    float3 dims;
+};
+
 // for reading exact int coords
 __constant sampler_t samp_i =
     CLK_NORMALIZED_COORDS_FALSE |
@@ -42,6 +52,9 @@ inline float4 ix(image3d_t img, int3 c) {
 }
 
 void __kernel init_grid(
+    uint walls,
+    uint nobjs,
+    __global const struct Object *objects,
     __write_only image3d_t U,       // velocity
     __write_only image3d_t T,       // thermo
     __write_only image3d_t B)       // boundaries
@@ -54,15 +67,31 @@ void __kernel init_grid(
         ny = get_image_height(B),
         nz = get_image_depth(B);
 
-    uint val;
-    if (pos.x == 0 || pos.x == nx-1 || pos.z == 0 || pos.z == nz-1 || pos.y == 0 || pos.y == ny-1) {
-        val = 1;    // walls (incl. floor & ceiling) are solid
-    }/* else if (5 > distance(convert_float3(pos), (float3)(32, 40, 32))) {
-        val = 2;
-    } */else {
-        val = 0;    // fluid everywhere else
+    // set walls as boundaries
+    uint b = 0;
+    if (walls) {
+        if (pos.x == 0 || pos.x == nx-1
+         || pos.y == 0 || pos.y == ny-1
+         || pos.z == 0 || pos.z == nz-1)
+         {
+             b = 1;
+         }
     }
-    write_imageui(B, pos, val);
+
+    // voxelize objects
+    for (int i = 0; i < nobjs; i++) {
+        float3 op = objects[i].pos;
+        float3 od = objects[i].dims;
+
+        if (pos.x >= op.x-od.x && pos.x <= op.x+od.x
+         && pos.y >= op.y-od.y && pos.y <= op.y+od.y
+         && pos.z >= op.z-od.z && pos.z <= op.z+od.z)
+         {
+             b = 1;
+         }
+    }
+
+    write_imageui(B, pos, b);
 }
 
 
@@ -72,7 +101,7 @@ void __kernel advect(
     __read_only image3d_t T,
     __write_only image3d_t U_out,
     __write_only image3d_t T_out)
-{
+    {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float3 fpos = convert_float3(pos) + 0.5f;
@@ -167,11 +196,11 @@ void __kernel reaction(
     // heat & smoke source
     if (ex.w > 0) {
         float d = distance(convert_float3(pos), ex.xyz);
-        float radius = 6;
+        float radius = 8;
         if (d < radius) {
             float a = min(radius - d, 1.0f);
             f.x = 3000 * a;
-            f.y = 10 * a;
+            f.y = 20 * a;
         }
     }
 
@@ -231,27 +260,22 @@ void __kernel project(
 
 void __kernel set_bounds(
     __read_only image3d_t B,
-    __read_only image3d_t in,
-    __write_only image3d_t out)
+    __read_only image3d_t U,
+    __read_only image3d_t T,
+    __write_only image3d_t U_out,
+    __write_only image3d_t T_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    float4 f = ix(in, pos);
+
+    float4 u = ix(U, pos);
+    float4 t = ix(T, pos);
 
     int b = read_imageui(B, pos).x;
-    if (b == 1) {
-        int nx = get_image_width(B),
-            ny = get_image_height(B),
-            nz = get_image_depth(B);
+    u *= (1 - b);
+    t *= (1 - b);
 
-        if (pos.x == 0)         f = ix(in, pos + dx);
-        else if (pos.x == nx-1) f = ix(in, pos - dx);
-        else if (pos.y == 0)    f = ix(in, pos + dy);
-        else if (pos.y == ny-1) f = ix(in, pos - dy);
-        else if (pos.z == 0)    f = ix(in, pos + dz);
-        else if (pos.z == nz-1) f = ix(in, pos - dz);
-    }
-
-    write_imagef(out, pos, f);
+    write_imagef(U_out, pos, u);
+    write_imagef(T_out, pos, t);
 }
 
 #include "render.cl"

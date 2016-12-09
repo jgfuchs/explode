@@ -1,7 +1,8 @@
 SimParam {
     grid 64 64 64
     dt 0.04
-    nsteps 200
+    nsteps 50
+    walls 0
 }
 
 Camera {
@@ -12,9 +13,15 @@ Camera {
 }
 
 Light {
-    
+    pos 5 10 0
+    I 1.0
 }
 
 Explosion {
     t0 0.1
+}
+
+Object {
+    pos 32 40 32
+    dims 16 6 16
 }
