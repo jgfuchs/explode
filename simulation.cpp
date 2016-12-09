@@ -8,23 +8,21 @@ Simulation::Simulation(Scene *sc, bool prof) :
 {
     try {
         initOpenCL();
+        initProfiling();
+        initGrid();
     } catch (cl::Error err) {
         std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
         exit(1);
     }
-
-    initProfiling();
-    initGrid();
 }
 
 void Simulation::advance() {
     // fluid flow
     setBounds();
-
     addForces();
     project();
     advect();
-    project();
+    project();   // necessary??
 
     // fire & dangerous things
     reaction();
@@ -89,7 +87,7 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
-    kRender = cl::Kernel(program, "render");
+    kRender = cl::Kernel(program, "render_slice");
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
 
@@ -124,7 +122,7 @@ void Simulation::initGrid() {
         sizeof(Object) * nobjs, (void *)scene->objects.data());
 
     kInitGrid.setArg(0, prms.walls);
-    kInitGrid.setArg(1, nobjs);
+    kInitGrid.setArg(1, nobjs-1);
     kInitGrid.setArg(2, objs);
     kInitGrid.setArg(3, U);
     kInitGrid.setArg(4, T);

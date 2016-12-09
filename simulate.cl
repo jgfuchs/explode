@@ -15,8 +15,7 @@ struct Explosion {
 };
 
 struct Object {
-    float3 pos;
-    float3 dims;
+    float3 pos0, pos1;
 };
 
 // for reading exact int coords
@@ -31,15 +30,10 @@ __constant sampler_t samp_f =
     CLK_ADDRESS_CLAMP_TO_EDGE |
     CLK_FILTER_LINEAR;
 
-// for reading normalized float coords, with interpolation
-__constant sampler_t samp_n =
-    CLK_NORMALIZED_COORDS_TRUE |
-    CLK_ADDRESS_CLAMP_TO_EDGE |
-    CLK_FILTER_LINEAR;
-
 // physics constants
-__constant float
+__constant const float
     h           = 0.25,     // cell side length
+    rh          = 1.0f/h,   // cells per unit length
     grav        = 9.8,      // acceleration due to gravity
     cBuoy       = 0.015,    // buoyancy multiplier
     cSink       = 0.01,     // smoke sinking
@@ -55,6 +49,12 @@ __constant int3 dx = {1, 0, 0},
 // lookup value at coordinate (i, j, k) in image
 inline float4 ix(image3d_t img, int3 c) {
     return read_imagef(img, samp_i, c);
+}
+
+inline bool inObj(float3 p0, float3 p1, float3 pos) {
+    return pos.x >= p0.x && pos.x <= p1.x
+        && pos.y >= p0.y && pos.y <= p1.y
+        && pos.z >= p0.z && pos.z <= p1.z;
 }
 
 void __kernel init_grid(
@@ -80,17 +80,17 @@ void __kernel init_grid(
          || pos.y == 0 || pos.y == ny-1
          || pos.z == 0 || pos.z == nz-1)
          {
-             b = 1;
+             b = 2;
          }
     }
 
     // voxelize objects
     for (int i = 0; i < nobjs; i++) {
-        float3 op = objects[i].pos;
-        float3 od = objects[i].dims;
-        if (pos.x >= op.x-od.x && pos.x <= op.x+od.x
-         && pos.y >= op.y-od.y && pos.y <= op.y+od.y
-         && pos.z >= op.z-od.z && pos.z <= op.z+od.z)
+        float3 p0 = objects[i].pos0;
+        float3 p1 = objects[i].pos1;
+        if (pos.x >= p0.x && pos.x <= p1.x
+         && pos.y >= p0.y && pos.y <= p1.y
+         && pos.z >= p0.z && pos.z <= p1.z)
          {
              b = 1;
          }
@@ -106,11 +106,11 @@ void __kernel advect(
     __read_only image3d_t T,
     __write_only image3d_t U_out,
     __write_only image3d_t T_out)
-    {
+{
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float3 fpos = convert_float3(pos) + 0.5f;
-    float3 p0 = fpos - dt * (1.0f / h) * read_imagef(U, pos).xyz;
+    float3 p0 = fpos - dt * rh * read_imagef(U, pos).xyz;
 
     write_imagef(U_out, pos, read_imagef(U, samp_f, p0));
     write_imagef(T_out, pos, read_imagef(T, samp_f, p0));
@@ -139,7 +139,7 @@ void __kernel curl(
         0
     };
 
-    curl.xyz *= 0.5f / h;
+    curl.xyz *= 0.5f * rh;
     curl.w = length(curl.xyz);
 
     write_imagef(Curl, pos, curl);
@@ -173,7 +173,7 @@ void __kernel add_forces(
             ix(Curl, pos + dy).w - ix(Curl, pos - dy).w,
             ix(Curl, pos + dz).w - ix(Curl, pos - dz).w,
         };
-        eta = normalize(eta * 0.5f / h);
+        eta = normalize(eta * 0.5f * rh);
 
         // force = eps * (|eta| x curl U) * dh
         f.xyz += vortEps * cross(eta, ix(Curl, pos).xyz) * h;
@@ -258,7 +258,7 @@ void __kernel project(
     };
 
     float3 vOld = read_imagef(U, pos).xyz;
-    float3 vNew = vOld - 0.5f * (1.0f / h) * gradP;
+    float3 vNew = vOld - 0.5f * rh * gradP;
     write_imagef(U_out, pos, (float4)(vNew, 0));
 }
 
@@ -276,8 +276,10 @@ void __kernel set_bounds(
     float4 t = ix(T, pos);
 
     int b = read_imageui(B, pos).x;
-    u *= (1 - b);
-    t *= (1 - b);
+    if (b) {
+        u = 0;
+        t = 0;
+    }
 
     write_imagef(U_out, pos, u);
     write_imagef(T_out, pos, t);

@@ -51,7 +51,7 @@ struct Explosion {
 
 // rectangular prisms only
 struct Object {
-    cl_float3 pos, dims;
+    cl_float3 pos0, pos1;
 } __attribute__ ((packed));
 
 class Scene {

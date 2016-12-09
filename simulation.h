@@ -68,6 +68,7 @@ private:
     // profiling
     enum {INIT_GRID, ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI,
         PROJECT, SET_BOUNDS, RENDER, _LAST};
+
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;

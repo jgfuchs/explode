@@ -27,9 +27,10 @@ void __kernel render_slice(
     float4 sp = (float4)(fpos, 32, 0);
     uint b = read_imageui(B, samp_f, sp).x;
     float4 t = read_imagef(T, samp_f, sp);
+
     float s = clamp(t.y*60, 0.0f, 255.0f);
     uint4 color = {255 - convert_uint3((float3)(s)), 255};
-    if (b) {
+    if (b > 0) {
         color.xyz = (uint3)(255, 128, 0);
     }
 

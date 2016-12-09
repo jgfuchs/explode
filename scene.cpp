@@ -31,6 +31,9 @@ Scene::Scene(char *fname) : in(fname) {
         }
     }
 
+    // "null" object
+    objects.push_back({{-1,-1,-1}, {-1, -1, -1}});
+
     // sort explosions so that popping returns earliest
     std::sort(explosions.begin(), explosions.end(),
         [](Explosion a, Explosion b) { return a.t0 > b.t0;});
@@ -139,10 +142,10 @@ void Scene::parseObject() {
     expect("{");
     while (true) {
         auto tok = getToken();
-        if (tok == "pos") {
-            obj.pos = getFloat3();
-        } else if (tok == "dims") {
-            obj.dims = getFloat3();
+        if (tok == "pos0") {
+            obj.pos0 = getFloat3();
+        } else if (tok == "pos1") {
+            obj.pos1 = getFloat3();
         } else if (tok == "}") {
             break;
         } else {
@@ -150,19 +153,16 @@ void Scene::parseObject() {
             exit(1);
         }
     }
-    // half-dimensions more useful
-    obj.dims.x *= 0.5;
-    obj.dims.y *= 0.5;
-    obj.dims.z *= 0.5;
     objects.push_back(obj);
 }
 
 std::string Scene::getToken() {
     std::string s;
     in >> s;
-    if (s.size() && s[0] == '#') {
+    while (s[0] == '#') {
         std::string tmp;
         std::getline(in, tmp);
+        s.erase();
         in >> s;
     }
     return s;
