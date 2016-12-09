@@ -25,18 +25,24 @@ __constant sampler_t samp_i =
     CLK_ADDRESS_CLAMP_TO_EDGE |
     CLK_FILTER_NEAREST;
 
-// for reading interpolated float coords
+// for reading float coords, with interpolation
 __constant sampler_t samp_f =
     CLK_NORMALIZED_COORDS_FALSE |
     CLK_ADDRESS_CLAMP_TO_EDGE |
     CLK_FILTER_LINEAR;
 
+// for reading normalized float coords, with interpolation
+__constant sampler_t samp_n =
+    CLK_NORMALIZED_COORDS_TRUE |
+    CLK_ADDRESS_CLAMP_TO_EDGE |
+    CLK_FILTER_LINEAR;
+
 // physics constants
 __constant float
-    h           = 0.5,      // cell side length
+    h           = 0.25,     // cell side length
     grav        = 9.8,      // acceleration due to gravity
-    cBuoy       = 0.03,     // buoyancy multiplier
-    cSink       = 0.0,      // smoke sinking
+    cBuoy       = 0.015,    // buoyancy multiplier
+    cSink       = 0.01,     // smoke sinking
     tAmb        = 300,      // ambient temperature
     tMax        = 6000,     // maximum temperature
     cCooling    = 1200,     // cooling factor
@@ -82,7 +88,6 @@ void __kernel init_grid(
     for (int i = 0; i < nobjs; i++) {
         float3 op = objects[i].pos;
         float3 od = objects[i].dims;
-
         if (pos.x >= op.x-od.x && pos.x <= op.x+od.x
          && pos.y >= op.y-od.y && pos.y <= op.y+od.y
          && pos.z >= op.z-od.z && pos.z <= op.z+od.z)
