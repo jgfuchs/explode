@@ -1,3 +1,14 @@
+
+struct Camera {
+    float3 pos, center, up;
+    uint width, height;
+};
+
+struct Light {
+    float3 pos;
+    float intensity;
+};
+
 // for reading exact int coords
 __constant sampler_t samp_i =
     CLK_NORMALIZED_COORDS_FALSE |
@@ -12,15 +23,14 @@ __constant sampler_t samp_f =
 
 // physics constants
 __constant float
-    h           = 0.5,      // cell side length (m)
-    grav        = 9.8,      // acceleration due to gravity (m/s^2)
-    cBuoy       = 0.10,     // buoyancy multiplier (m/Ks^2)
-    cSink       = 0.35,     // smoke sinking
-    airDens     = 1.29,     // density of air  (kg/m^3)
-    tAmb        = 300,      // ambient temperature (K)
-    tMax        = 4000,     // maximum temperature (K)
-    cCooling    = 2000,     // cooling factor (K/s)
-    vortEps     = 4.0;      // vorticity confinement coefficient
+    h           = 0.5,      // cell side length
+    grav        = 9.8,      // acceleration due to gravity
+    cBuoy       = 0.03,     // buoyancy multiplier
+    cSink       = 0.0,      // smoke sinking
+    tAmb        = 300,      // ambient temperature
+    tMax        = 6000,     // maximum temperature
+    cCooling    = 1200,     // cooling factor
+    vortEps     = 8.0;      // vorticity confinement
 
 __constant int3 dx = {1, 0, 0},
                 dy = {0, 1, 0},
@@ -118,7 +128,7 @@ void __kernel add_forces(
     f.y += cBuoy * (therm.x - tAmb);
 
     // smoke sinks
-    f.y -= cSink * therm.y * grav;
+    f.y -= cSink * grav * therm.y;
 
     // vorticity confinement
     {
@@ -144,19 +154,25 @@ void __kernel reaction(
     const float dt,
     __read_only image3d_t T,
     __write_only image3d_t T_out,
-    const float3 xy)
+    const float4 ex)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     float4 f = read_imagef(T, pos);
 
-    // cooling (cheaper than real heat diffusion)
+    // cooling
     float r  = (f.x - tAmb) / (tMax - tAmb);
-    f.x -= cCooling * pown(r, 4);
+    f.x = max(f.x - cCooling * pown(r, 4), tAmb);   // don't go below ambient
 
     // heat & smoke source
-    r = distance(convert_float3(pos), xy);
-    f.x += 500 * exp(-r*r / 6);
-    f.y += 5 * exp(-r*r / 6);
+    if (ex.w > 0) {
+        float d = distance(convert_float3(pos), ex.xyz);
+        float radius = 6;
+        if (d < radius) {
+            float a = min(radius - d, 1.0f);
+            f.x = 3000 * a;
+            f.y = 10 * a;
+        }
+    }
 
     write_imagef(T_out, pos, f);
 }
@@ -266,27 +282,36 @@ void __kernel set_bounds(
 
 
 void __kernel render(
+    const struct Camera cam,
+    const struct Light light,
     __read_only image3d_t U,
     __read_only image3d_t T,
     __read_only image3d_t B,
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
-
     float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
-    float4 sp = (float4)(fpos, 0.5, 0.0);
 
-    float acc = 0.0f;
-    while (sp.z < 64.0f) {
-        float s = read_imagef(T, samp_f, sp).y;
-        acc += s;
-        sp.z += 0.5f;
-    }
-    
-    uint4 color = {convert_uint3((float3)(acc)), 255};
+    // float4 sp = (float4)(fpos, 0.5, 0.0);
+    // float acc = 0.0f;
+    // while (sp.z < 64.0f) {
+    //     float s = read_imagef(T, samp_f, sp).y;
+    //     acc += s;
+    //     sp.z += 0.5f;
+    // }
+    // uint4 color = {convert_uint3((float3)(acc)), 255};
 
-    // float3 vel = read_imagef(U, samp_f, sp).xyz;
-    // uint4 color = {convert_uint3(vel*7), 255};
+    float4 sp = (float4)(fpos, 32, 0);
+    float3 t = read_imagef(T, samp_f, sp).xyz;
+    uint4 color = {convert_uint3((float3)(t.y*60)), 255};
+    // uint4 color = {convert_uint3((float3)((t.x-tAmb)*0.4)), 255};
+
+    // float4 sp = (float4)(fpos, 32, 0);
+    // float p = read_imagef(B, samp_f, sp).x;
+    // uint4 color = {convert_uint3((float3)(p)*60), 255};
+
+    // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 32, 0)).xyz;
+    // uint4 color = {convert_uint3((float3)(fabs(vel*10))), 255};
 
     write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
 }

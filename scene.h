@@ -5,39 +5,45 @@
 
 #include <fstream>
 #include <vector>
-#include <vecmath.h>
+#include <CL/cl.hpp>
 
 struct SimParams {
     SimParams() :
         grid_w(128), grid_h(128), grid_d(128),
-        nsteps(10), dt(0.01), cellSize(0.1) {}
+        nsteps(10), dt(0.01) {}
 
     int grid_w, grid_h, grid_d;
     int nsteps;
-    float dt, cellSize;
+    float dt;
 };
 
 struct Camera {
     Camera() :
-        pos(Vector3f(0, 0, -10)),
-        center(Vector3f(0, 0, 0)),
-        up(Vector3f(0, 1, 0)),
+        pos({0, 0, -10}),
+        center({0, 0, 0}),
+        up({0, 1, 0}),
         width(600),
         height(600) {}
 
-    Vector3f pos, center, up;
-    unsigned width, height;
+    cl_float3 pos, center, up;
+    cl_uint width, height;
+};
+
+struct Light {
+    Light() : pos({1, 10, 0}), intensity(1) {}
+
+    cl_float3 pos;
+    cl_float intensity;
 };
 
 struct Explosion {
     Explosion() :
-        pos(Vector3f(0, 0, 0)),
+        pos({0, 0, 0}),
         size(1.0f),
         t0(0.0f) {}
 
-    Vector3f pos;
-    float size;
-    float t0;
+    cl_float3 pos;
+    cl_float size, t0;
 };
 
 struct Object {
@@ -51,6 +57,7 @@ public:
     // scene description
     SimParams params;
     Camera cam;
+    Light light;
     std::vector<Explosion> explosions;
     std::vector<Object *> objects;
 
@@ -60,6 +67,7 @@ private:
 
     void parseSimParams();
     void parseCamera();
+    void parseLight();
     void parseObject();
     void parseExplosion();
 
@@ -67,7 +75,7 @@ private:
     void expect(std::string s);
     int getInt();
     float getFloat();
-    Vector3f getVector3f();
+    cl_float3 getFloat3();
 
     void debugInfo();
 };

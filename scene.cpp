@@ -21,6 +21,8 @@ Scene::Scene(char *fname) : in(fname) {
             parseObject();
         } else if (tok == "Explosion") {
             parseExplosion();
+        } else if (tok == "Light") {
+            parseLight();
         } else if (tok == "") {
             // do nothing, not sure why this happens
         } else {
@@ -63,8 +65,6 @@ void Scene::parseSimParams() {
             params.dt = getFloat();
         } else if (tok == "nsteps") {
             params.nsteps = getInt();
-        } else if (tok == "cellSize") {
-            params.cellSize = getFloat();
         } else if (tok == "}") {
             break;
         } else {
@@ -79,11 +79,11 @@ void Scene::parseCamera() {
     while (true) {
         auto tok = getToken();
         if (tok == "pos") {
-            cam.pos = getVector3f();
+            cam.pos = getFloat3();
         } else if (tok == "center") {
-            cam.center = getVector3f();
+            cam.center = getFloat3();
         } else if (tok == "up") {
-            cam.up = getVector3f();
+            cam.up = getFloat3();
         } else if (tok == "size") {
             cam.width = getInt();
             cam.height = getInt();
@@ -95,6 +95,23 @@ void Scene::parseCamera() {
             break;
         } else {
             std::cerr << "Error: unexpected token '" << tok << "' in Camera\n";
+            exit(1);
+        }
+    }
+}
+
+void Scene::parseLight() {
+    expect("{");
+    while (true) {
+        auto tok = getToken();
+        if (tok == "pos") {
+            light.pos = getFloat3();
+        } else if (tok == "I") {
+            light.intensity = getFloat();
+        } else if (tok == "}") {
+            break;
+        } else {
+            std::cerr << "Error: unexpected token '" << tok << "' in Light\n";
             exit(1);
         }
     }
@@ -112,7 +129,7 @@ void Scene::parseExplosion() {
     while (true) {
         auto tok = getToken();
         if (tok == "pos") {
-            ex.pos = getVector3f();
+            ex.pos = getFloat3();
         } else if (tok == "size") {
             ex.size = getFloat();
         } else if (tok == "t0") {
@@ -174,25 +191,36 @@ float Scene::getFloat() {
     return f;
 }
 
-Vector3f Scene::getVector3f() {
+cl_float3 Scene::getFloat3() {
     float f1 = getFloat(),
           f2 = getFloat(),
           f3 = getFloat();
-    return Vector3f(f1, f2, f3);
+    return {f1, f2, f3};
+}
+
+
+inline std::ostream &
+operator<<(std::ostream &os, const cl_float3 &h)
+{
+    os << "(" << h.x << ", " << h.y << ", " << h.z << ")";
+    return os;
 }
 
 void Scene::debugInfo() {
     std::cout << "Params: "
         << "grid=(" << params.grid_w << ", " << params.grid_h << ", " << params.grid_d << ") "
         << "steps=" << params.nsteps << " "
-        << "dt=" << params.dt << " "
-        << "cellSize=" << params.cellSize << "\n";
+        << "dt=" << params.dt << "\n";
 
     std::cout << "Camera: "
         << "pos=" << cam.pos << " "
         << "center=" << cam.center << " "
         << "up=" << cam.up << " "
         << "size=(" << cam.width << ", " << cam.height << ")" << "\n";
+
+    std::cout << "light: "
+        << "pos=" << light.pos << " "
+        << "intensity=" << light.intensity << "\n";
 
     std::cout << "Explosions:\n";
     for (unsigned i = 0; i < explosions.size(); i++) {

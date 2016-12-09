@@ -42,10 +42,12 @@ void Simulation::render(HostImage &img) {
         h = scene->cam.height;
 
     // render to target image
-    kRender.setArg(0, U);
-    kRender.setArg(1, T);
-    kRender.setArg(2, B);
-    kRender.setArg(3, target);
+    kRender.setArg(0, scene->cam);
+    kRender.setArg(1, scene->light);
+    kRender.setArg(2, U);
+    kRender.setArg(3, T);
+    kRender.setArg(4, P);
+    kRender.setArg(5, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
     profile(RENDER);
@@ -153,10 +155,16 @@ void Simulation::addForces() {
 }
 
 void Simulation::reaction() {
-    cl_float3 p;
-    p.y = 8 + randf()*0.5;
-    p.x = 32 + std::sin(2*t) * 2;
-    p.z = 32; //std::sin(.8*t) * 12;
+    static bool done = false;
+    cl_float4 p = {0, 0, 0, 0};
+    if (t > .1 && !done) {
+        done = true;
+
+        p.y = 10;// + randf()*0.5;
+        p.x = 32;//+ std::sin(2*t);
+        p.z = 32; //std::sin(.8*t) * 12;
+        p.w = t;
+    }
 
     kReaction.setArg(0, prms.dt);
     kReaction.setArg(1, T);
@@ -201,6 +209,7 @@ void Simulation::project() {
 }
 
 void Simulation::setVelBounds() {
+    return;
     kVelBounds.setArg(0, B);
     kVelBounds.setArg(1, U);
     kVelBounds.setArg(2, U_tmp);
@@ -210,6 +219,7 @@ void Simulation::setVelBounds() {
 }
 
 void Simulation::setBounds(cl::Image3D &in, cl::Image3D &out) {
+    return;
     kSetBounds.setArg(0, B);
     kSetBounds.setArg(1, in);
     kSetBounds.setArg(2, out);
@@ -218,11 +228,11 @@ void Simulation::setBounds(cl::Image3D &in, cl::Image3D &out) {
     std::swap(in, out);
 }
 
-inline void Simulation::enqueueGrid(cl::Kernel k) {
-    queue.enqueueNDRangeKernel(k,
-        cl::NullRange,
-        cl::NDRange(prms.grid_w, prms.grid_h, prms.grid_w),
-        cl::NDRange(8, 8, 8),
+inline void Simulation::enqueueGrid(cl::Kernel kernel) {
+    queue.enqueueNDRangeKernel(kernel,
+        cl::NullRange,          // offset
+        cl::NDRange(prms.grid_w, prms.grid_h, prms.grid_w), // global size
+        cl::NDRange(8, 8, 8),   // local (workgroup) size
         NULL, &event);
 }
 
@@ -238,8 +248,8 @@ void Simulation::profile(int pk) {
 }
 
 void Simulation::dumpProfiling() {
+    std::cout << "\n";
     if (profiling) {
-
         static const std::string kernelNames[_LAST] = { "advect", "curl",
             "addForces", "reaction", "divergence", "jacobi", "project",
             "velBounds", "setBounds", "render"};

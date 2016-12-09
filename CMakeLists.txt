@@ -3,12 +3,7 @@ cmake_minimum_required(VERSION 3.1)
 project(explode)
 
 list(APPEND LIBS OpenCL)
-
 include_directories(lib)
-include_directories(lib/vecmath/include)
-add_subdirectory(lib/vecmath)
-list(APPEND LIBS vecmath)
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O2")
 
 list(APPEND SRC_FILES

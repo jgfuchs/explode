@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     }
 
     Scene scene(argv[1]);
-    Simulation sim(&scene, true);
+    Simulation sim(&scene, false);
 
     HostImage img(scene.cam.width, scene.cam.height);
     for (int i = 0; i < scene.params.nsteps; i++) {
