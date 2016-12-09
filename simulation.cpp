@@ -21,14 +21,11 @@ void Simulation::advance() {
     // fluid flow
     addForces();
     project();
-    advect(U, U_tmp);
-    setVelBounds();
+    advect();
     project();
 
     // fire & dangerous things
     reaction();
-    advect(T, T_tmp);
-    setBounds(T, T_tmp);
 
     t += prms.dt;
 }
@@ -89,7 +86,6 @@ void Simulation::initOpenCL() {
     kDivergence = cl::Kernel(program, "divergence");
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
-    kVelBounds = cl::Kernel(program, "set_vel_bounds");
     kSetBounds = cl::Kernel(program, "set_bounds");
     kRender = cl::Kernel(program, "render");
 
@@ -127,14 +123,17 @@ void Simulation::initGrid() {
     enqueueGrid(kInitGrid);
 }
 
-void Simulation::advect(cl::Image3D &in, cl::Image3D &out) {
+void Simulation::advect() {
     kAdvect.setArg(0, prms.dt);
     kAdvect.setArg(1, U);
-    kAdvect.setArg(2, in);
-    kAdvect.setArg(3, out);
+    kAdvect.setArg(2, T);
+    kAdvect.setArg(3, U_tmp);
+    kAdvect.setArg(4, T_tmp);
     enqueueGrid(kAdvect);
     profile(ADVECT);
-    std::swap(in, out);
+
+    std::swap(U, U_tmp);
+    std::swap(T, T_tmp);
 }
 
 void Simulation::addForces() {
@@ -205,17 +204,6 @@ void Simulation::project() {
     enqueueGrid(kProject);
     profile(PROJECT);
     std::swap(U, U_tmp);
-    setVelBounds();
-}
-
-void Simulation::setVelBounds() {
-    return;
-    kVelBounds.setArg(0, B);
-    kVelBounds.setArg(1, U);
-    kVelBounds.setArg(2, U_tmp);
-    enqueueGrid(kVelBounds);
-    profile(VEL_BOUNDS);
-    std::swap(U, U_tmp);
 }
 
 void Simulation::setBounds(cl::Image3D &in, cl::Image3D &out) {
@@ -252,7 +240,7 @@ void Simulation::dumpProfiling() {
     if (profiling) {
         static const std::string kernelNames[_LAST] = { "advect", "curl",
             "addForces", "reaction", "divergence", "jacobi", "project",
-            "velBounds", "setBounds", "render"};
+            "setBounds", "render"};
 
         std::cout << "\n\nProfiling info:\n";
         printl("Kernel");

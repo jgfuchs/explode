@@ -27,7 +27,7 @@ private:
     void initGrid();
 
     // fluid dynamics
-    void advect(cl::Image3D&, cl::Image3D&);
+    void advect();
     void addForces();
     void reaction();
     void project();
@@ -50,7 +50,7 @@ private:
 
     // all kernel handles
     cl::Kernel kInitGrid, kAdvect, kCurl, kAddForces, kReaction, kDivergence,
-        kJacobi, kProject, kVelBounds, kSetBounds, kRender;
+        kJacobi, kProject, kSetBounds, kRender;
 
     cl::NDRange gridRange, groupRange;
 
@@ -68,7 +68,7 @@ private:
 
     // profiling
     enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
-        VEL_BOUNDS, SET_BOUNDS, RENDER, _LAST};
+        SET_BOUNDS, RENDER, _LAST};
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];
     cl::Event event;

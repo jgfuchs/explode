@@ -69,16 +69,17 @@ void __kernel init_grid(
 void __kernel advect(
     const float dt,
     __read_only image3d_t U,
-    __read_only image3d_t in,
-    __write_only image3d_t out)
+    __read_only image3d_t T,
+    __write_only image3d_t U_out,
+    __write_only image3d_t T_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
-    float3 p = convert_float3(pos) + 0.5f;
-    float3 pback = p - dt * (1.0f / h) * read_imagef(U, pos).xyz;
-    float4 val = read_imagef(in, samp_f, pback);
+    float3 fpos = convert_float3(pos) + 0.5f;
+    float3 p0 = fpos - dt * (1.0f / h) * read_imagef(U, pos).xyz;
 
-    write_imagef(out, pos, val);
+    write_imagef(U_out, pos, read_imagef(U, samp_f, p0));
+    write_imagef(T_out, pos, read_imagef(T, samp_f, p0));
 }
 
 
@@ -228,33 +229,6 @@ void __kernel project(
 }
 
 
-
-void __kernel set_vel_bounds(
-    __read_only image3d_t B,
-    __read_only image3d_t U,
-    __write_only image3d_t U_out)
-{
-    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    float4 v = ix(U, pos);
-
-    int b = read_imageui(B, pos).x;
-    if (b == 1) {
-        int nx = get_image_width(B),
-            ny = get_image_height(B),
-            nz = get_image_depth(B);
-
-        if (pos.x == 0)         { v = ix(U, pos + dx); v.x *= -1; }
-        else if (pos.x == nx-1) { v = ix(U, pos - dx); v.x *= -1; }
-        else if (pos.y == 0)    { v = ix(U, pos + dy); v.y *= -1; }
-        else if (pos.y == ny-1) { v = ix(U, pos - dy); v.y *= -1; }
-        else if (pos.z == 0)    { v = ix(U, pos + dz); v.z *= -1; }
-        else if (pos.z == nz-1) { v = ix(U, pos - dz); v.z *= -1; }
-    }
-
-    write_imagef(U_out, pos, v);
-}
-
-
 void __kernel set_bounds(
     __read_only image3d_t B,
     __read_only image3d_t in,
@@ -280,38 +254,4 @@ void __kernel set_bounds(
     write_imagef(out, pos, f);
 }
 
-
-void __kernel render(
-    const struct Camera cam,
-    const struct Light light,
-    __read_only image3d_t U,
-    __read_only image3d_t T,
-    __read_only image3d_t B,
-    __write_only image2d_t img)
-{
-    int2 pos = {get_global_id(0), get_global_id(1)};
-    float2 fpos = convert_float2(pos) * get_image_width(U) / get_image_width(img);
-
-    // float4 sp = (float4)(fpos, 0.5, 0.0);
-    // float acc = 0.0f;
-    // while (sp.z < 64.0f) {
-    //     float s = read_imagef(T, samp_f, sp).y;
-    //     acc += s;
-    //     sp.z += 0.5f;
-    // }
-    // uint4 color = {convert_uint3((float3)(acc)), 255};
-
-    float4 sp = (float4)(fpos, 32, 0);
-    float3 t = read_imagef(T, samp_f, sp).xyz;
-    uint4 color = {convert_uint3((float3)(t.y*60)), 255};
-    // uint4 color = {convert_uint3((float3)((t.x-tAmb)*0.4)), 255};
-
-    // float4 sp = (float4)(fpos, 32, 0);
-    // float p = read_imagef(B, samp_f, sp).x;
-    // uint4 color = {convert_uint3((float3)(p)*60), 255};
-
-    // float3 vel = read_imagef(U, samp_f, (float4)(fpos, 32, 0)).xyz;
-    // uint4 color = {convert_uint3((float3)(fabs(vel*10))), 255};
-
-    write_imageui(img, (int2)(pos.x, get_image_height(img)-1-pos.y), color);
-}
+#include "render.cl"
