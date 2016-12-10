@@ -54,6 +54,8 @@ void Scene::parseSimParams() {
             params.dt = getFloat();
         } else if (tok == "nsteps") {
             params.nsteps = getInt();
+        } else if (tok == "niters") {
+            params.niters = getInt();
         } else if (tok == "walls") {
             params.walls = getInt();
         } else if (tok == "}") {
@@ -94,7 +96,7 @@ void Scene::parseLight() {
         auto tok = getToken();
         if (tok == "pos") {
             light.pos = getFloat3();
-        } else if (tok == "I") {
+        } else if (tok == "intensity") {
             light.intensity = getFloat();
         } else if (tok == "}") {
             break;

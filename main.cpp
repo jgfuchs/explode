@@ -35,18 +35,18 @@ int main(int argc, char *argv[]) {
     Scene scene(argv[1]);
     Simulation sim(&scene, true);
     HostImage img(scene.cam.size.x, scene.cam.size.y);
-    int ns = scene.params.nsteps;
 
+    int nsteps = scene.params.nsteps;
     auto t0 = time_now();
-    for (int i = 0; i < ns; i++) {
+    for (int i = 0; i < nsteps; i++) {
         sim.advance();
         sim.render(img);
         saveImage(img, i);
 
-        printStatus(i, scene.params.nsteps, sim.getT());
+        printStatus(i, nsteps, sim.getT());
     }
     double t = time_since(t0);
-    std::cout << "\nFinished in " << t << " sec (" << (ns / t) << " fps)" << std::endl;
+    std::cout << "\nFinished in " << t << " sec (" << (nsteps / t) << " fps)\n";
 
     sim.dumpProfiling();
 }

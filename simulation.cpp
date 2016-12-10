@@ -181,9 +181,9 @@ void Simulation::project() {
     profile(DIVERGENCE);
 
     // solve laplace(P) = div(U) for P
-    // this where we spend ~3/4 of GPU time
-    const int NITERATIONS = 20;
-    for (int i = 0; i < NITERATIONS; i++) {
+    // this where we spend ~75% of GPU time
+    const int niters = scene->params.niters;
+    for (int i = 0; i < niters; i++) {
         kJacobi.setArg(0, P);
         kJacobi.setArg(1, Dvg);
         kJacobi.setArg(2, P_tmp);

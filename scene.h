@@ -11,11 +11,12 @@ struct SimParams {
     SimParams() :
         grid_n(128),
         nsteps(100),
+        niters(20),
         dt(0.02),
         walls(false) {}
 
     int grid_n;
-    int nsteps;
+    int nsteps, niters;
     float dt;
     cl_uint walls;
 };
