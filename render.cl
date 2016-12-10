@@ -63,8 +63,21 @@ void __kernel render(
     float3 bg = {0.5, 0.5, 0.9};
     if (pos.y < 0.0f) {
         bg = (float3)(0.5, 0.25, 0.0);
+        if (tx > 4.0f*TX_EPS) {
+            float3 ldir = normalize(light.pos - pos) * dsl;
+            float3 lpos = pos + ldir;
+            float txf = 1.0;
+            for (j = 0; j < nlsamp; j++) {
+                float rhol = read_imagef(T, samp_n, lpos).y;
+                txf *= 1.0f - 0.5f * rhol * dsl * absorption;
+                if (txf < TX_EPS) break;
+                lpos += ldir;
+            }
 
+            bg *= txf;
+        }
     }
+
 
     float3 l = Lo + tx * bg;
 
