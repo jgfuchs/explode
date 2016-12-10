@@ -21,46 +21,52 @@ void __kernel render(
 {
     int2 imgPos = {get_global_id(0), get_global_id(1)};
 
-    const int   nsamp = 64;
-    const int   nlsamp = 32;
-    const float maxDist = sqrt(3.0f);
-    const float scale = maxDist / nsamp;
-    const float lscale = maxDist / nlsamp;
+    const int   nsamp = 64;             // main ray samples
+    const int   nlsamp = 32;            // light ray samples
+    const float maxDist = sqrt(3.0f);   // cube diagonal
+    const float ds = maxDist / nsamp;   // main ray step size
+    const float dsl = maxDist / nlsamp; // light ray step size
     const float absorption = 15.0;
 
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
-    float3 dir = normalize(pos - cam.pos) * scale;
+    float3 dir = normalize(pos - cam.pos) * ds;
 
-    float tx = 1.0;
-    float Lo = 0.0;
+    float tx = 1.0;     // transmittance along ray
+    float Lo = 0.0;     // total light output along ray
 
     int i, j;
     for (i = 0; i < nsamp; i++) {
         float rho = read_imagef(T, samp_n, pos).y;
         if (rho > RHO_EPS) {
-            tx *= 1.0f - rho * scale * absorption;
+            tx *= 1.0f - rho * ds * absorption;
             if (tx < TX_EPS) break;
 
-            float3 ldir = normalize(light.pos - pos) * scale;
+            float3 ldir = normalize(light.pos - pos) * dsl;
             float3 lpos = pos + ldir;
             float txl = 1.0f;
 
             for (j = 0; j < nlsamp; j++) {
-                float lrho = read_imagef(T, samp_n, lpos).y;
-                txl *= 1.0f - lrho * scale * absorption;
+                float rhol = read_imagef(T, samp_n, lpos).y;
+                txl *= 1.0f - rhol * dsl * absorption;
                 if (txl < TX_EPS) break;
 
                 lpos += ldir;
             }
 
             float Li = light.intensity * txl;
-            Lo += Li * tx * rho * scale;
+            Lo += Li * tx * rho * ds;
         }
 
         pos += dir;
     }
 
-    float3 l = Lo + tx*(float3)(.5, .5, .9);
+    float3 bg = {0.5, 0.5, 0.9};
+    if (pos.y < 0.0f) {
+        bg = (float3)(0.5, 0.25, 0.0);
+
+    }
+
+    float3 l = Lo + tx * bg;
 
     uint4 color = {0, 0, 0, 255};
     color.xyz = convert_uint3(l*255);
