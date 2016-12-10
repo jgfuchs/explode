@@ -5,6 +5,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <chrono>
 
 // an image in host memory
 class HostImage {
@@ -29,6 +30,17 @@ inline void printl(T t, const int w=11) {
     std::cout << std::left << std::setw(w) << t;
 }
 
-float randf();
+typedef std::chrono::high_resolution_clock::time_point TimePoint;
+
+inline TimePoint time_now() {
+    return std::chrono::high_resolution_clock::now();
+}
+
+inline double time_since(TimePoint &then) {
+    auto now = time_now();
+    std::chrono::duration<double> dur = now - then;
+    return dur.count();
+}
+
 
 #endif // __UTIL_H__

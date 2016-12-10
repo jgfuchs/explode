@@ -1,7 +1,8 @@
-#include <iostream>
+#include <chrono>
 #include <fstream>
-#include <sstream>
 #include <iomanip>
+#include <iostream>
+#include <sstream>
 
 #include "scene.h"
 #include "simulation.h"
@@ -32,16 +33,20 @@ int main(int argc, char *argv[]) {
     }
 
     Scene scene(argv[1]);
-    Simulation sim(&scene, false);
-
+    Simulation sim(&scene, true);
     HostImage img(scene.cam.size.x, scene.cam.size.y);
-    for (int i = 0; i < scene.params.nsteps; i++) {
+    int ns = scene.params.nsteps;
+
+    auto t0 = time_now();
+    for (int i = 0; i < ns; i++) {
         sim.advance();
         sim.render(img);
         saveImage(img, i);
 
         printStatus(i, scene.params.nsteps, sim.getT());
     }
+    double t = time_since(t0);
+    std::cout << "\nFinished in " << t << " sec (" << (ns / t) << " fps)" << std::endl;
 
     sim.dumpProfiling();
 }

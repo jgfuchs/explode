@@ -2,7 +2,6 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <random>
 
 #include "util.h"
 
@@ -40,10 +39,4 @@ std::string slurpFile(std::string fname) {
     std::stringstream sstr;
     sstr << in.rdbuf();
     return sstr.str();
-}
-
-float randf() {
-    static std::mt19937 mt(2);
-    static std::uniform_real_distribution<double> dist(-1.0, +1.0);
-    return dist(mt);
 }
