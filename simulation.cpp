@@ -41,10 +41,9 @@ void Simulation::render(HostImage &img) {
     // render to target image
     kRender.setArg(0, scene->cam);
     kRender.setArg(1, scene->light);
-    kRender.setArg(2, U);
-    kRender.setArg(3, T);
-    kRender.setArg(4, B);
-    kRender.setArg(5, target);
+    kRender.setArg(2, T);
+    kRender.setArg(3, B);
+    kRender.setArg(4, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
     profile(RENDER);
@@ -87,7 +86,7 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
-    kRender = cl::Kernel(program, "render_slice");
+    kRender = cl::Kernel(program, "render");
 
     int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
 

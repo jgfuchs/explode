@@ -1,21 +1,11 @@
 
-struct Camera {
-    float3 pos, center, up;
-    uint width, height;
-};
-
-struct Light {
-    float3 pos;
-    float intensity;
+struct Object {
+    float3 pos0, pos1;
 };
 
 struct Explosion {
     float3 pos;
     float size, t0;
-};
-
-struct Object {
-    float3 pos0, pos1;
 };
 
 // for reading exact int coords
@@ -28,6 +18,12 @@ __constant sampler_t samp_i =
 __constant sampler_t samp_f =
     CLK_NORMALIZED_COORDS_FALSE |
     CLK_ADDRESS_CLAMP_TO_EDGE |
+    CLK_FILTER_LINEAR;
+
+// for reading normalized float coords, with interpolation
+__constant sampler_t samp_n =
+    CLK_NORMALIZED_COORDS_TRUE |
+    CLK_ADDRESS_CLAMP |
     CLK_FILTER_LINEAR;
 
 // physics constants
@@ -204,8 +200,8 @@ void __kernel reaction(
         float radius = 8;
         if (d < radius) {
             float a = min(radius - d, 1.0f);
-            f.x = 3000 * a;
-            f.y = 20 * a;
+            f.x = 3000.0 * a;
+            f.y = a;
         }
     }
 
