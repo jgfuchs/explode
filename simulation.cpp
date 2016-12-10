@@ -17,16 +17,12 @@ Simulation::Simulation(Scene *sc, bool prof) :
 }
 
 void Simulation::advance() {
-    // fluid flow
     setBounds();
     addForces();
+    reaction();
     project();
     advect();
-    project();   // necessary??
-
-    // fire & dangerous things
-    reaction();
-
+    project();
     t += dt;
 }
 
@@ -162,11 +158,8 @@ void Simulation::reaction() {
     cl_float4 p = {0, 0, 0, 0};
     if (t > .1 && !done) {
         done = true;
-
-        p.y = 10;
-        p.x = 32;
-        p.z = 32;
-        p.w = t;
+        p = {32, 10, 32, 8};
+        // p = {64, 22, 64, 20};
     }
 
     kReaction.setArg(0, dt);

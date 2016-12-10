@@ -36,7 +36,7 @@ __constant const float
     tAmb        = 300,      // ambient temperature
     tMax        = 6000,     // maximum temperature
     cCooling    = 1200,     // cooling factor
-    vortEps     = 8.0;      // vorticity confinement
+    vortEps     = 5.0;     // vorticity confinement
 
 __constant int3 dx = {1, 0, 0},
                 dy = {0, 1, 0},
@@ -190,12 +190,11 @@ void __kernel reaction(
 
     // heat & smoke source
     if (ex.w > 0) {
-        float d = distance(convert_float3(pos), ex.xyz);
-        float radius = 8;
-        if (d < radius) {
-            float a = min(radius - d, 1.0f);
-            f.x = 3000.0 * a;
-            f.y = 2*a;
+        if (fabs(pos.x - ex.x) < ex.w
+         && fabs(pos.y - ex.y) < ex.w
+         && fabs(pos.z - ex.z) < ex.w) {
+            f.x = 3000.0;
+            f.y = 2;
         }
     }
 

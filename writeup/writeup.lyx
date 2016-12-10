@@ -7,6 +7,7 @@
 \textclass article
 \begin_preamble
 \date{}
+\hypersetup{citecolor=blue}
 
 \usepackage{sectsty}
 \sectionfont{\fontsize{14}{15}\selectfont}
@@ -33,9 +34,18 @@
 \output_sync 0
 \bibtex_command default
 \index_command default
-\paperfontsize default
+\paperfontsize 10
 \spacing single
-\use_hyperref false
+\use_hyperref true
+\pdf_bookmarks true
+\pdf_bookmarksnumbered false
+\pdf_bookmarksopen false
+\pdf_bookmarksopenlevel 1
+\pdf_breaklinks false
+\pdf_pdfborder false
+\pdf_colorlinks true
+\pdf_backref false
+\pdf_pdfusetitle true
 \papersize letterpaper
 \use_geometry true
 \use_package amsmath 1
@@ -114,8 +124,16 @@ Rendering
 Results
 \end_layout
 
-\begin_layout Section
-References
+\begin_layout Standard
+\begin_inset CommandInset bibtex
+LatexCommand bibtex
+btprint "btPrintAll"
+bibfiles "refs"
+options "plain"
+
+\end_inset
+
+
 \end_layout
 
 \end_body
