@@ -31,12 +31,14 @@ void __kernel render(
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
     float3 dir = normalize(pos - cam.pos) * ds;
 
-    float tx = 1.0;     // transmittance along ray
-    float Lo = 0.0;     // total light output along ray
+    float tx = 1.0;      // transmittance along ray
+    float3 Lo = 0.0;     // total light output from ray
 
     int i, j;
     for (i = 0; i < nsamp; i++) {
-        float rho = read_imagef(T, samp_n, pos).y;
+        float4 Tsamp = read_imagef(T, samp_n, pos);
+        float temp = Tsamp.x;
+        float rho = Tsamp.y;
         if (rho > RHO_EPS) {
             tx *= 1.0f - rho * ds * absorption;
             if (tx < TX_EPS) break;
@@ -54,7 +56,8 @@ void __kernel render(
             }
 
             float Li = light.intensity * txl;
-            Lo += Li * tx * rho * ds;
+            float3 Le = (float3)(1.0, 0.65, 0.0) * 100 * (temp - tAmb) / tMax;
+            Lo += (Li + Le) * tx * rho * ds;
         }
 
         pos += dir;
@@ -78,12 +81,10 @@ void __kernel render(
     //     }
     // }
 
-    float3 l = Lo + tx * bg;
+    float3 color = Lo + tx * bg;
 
-    uint4 color = {0, 0, 0, 255};
-    color.xyz = convert_uint3(l*255);
-
-    write_imageui(img, (int2)(imgPos.x, cam.size.y-1-imgPos.y), color);
+    uint4 rgba = {convert_uint3(color*255), 255};
+    write_imageui(img, (int2)(imgPos.x, cam.size.y-1-imgPos.y), rgba);
 }
 
 

@@ -158,8 +158,8 @@ void Simulation::reaction() {
     cl_float4 p = {0, 0, 0, 0};
     if (t > .1 && !done) {
         done = true;
-        p = {32, 10, 32, 8};
-        // p = {64, 22, 64, 20};
+        // p = {32, 10, 32, 8};
+        p = {64, 22, 64, 12};
     }
 
     kReaction.setArg(0, dt);
@@ -252,14 +252,12 @@ void Simulation::profile(int pk) {
 }
 
 void Simulation::dumpProfiling() {
-    std::cout << "\n";
     if (profiling) {
-
         static const std::string kernelNames[_LAST] = { "advect", "curl",
             "addForces", "reaction", "divergence", "jacobi", "project",
             "setBounds", "render"};
 
-        std::cout << "\n\nProfiling info:\n";
+        std::cout << "\nProfiling info:\n";
         printl("Kernel");
         printr("Calls", 8);
         printr("Time (s)");

@@ -34,9 +34,9 @@ __constant const float
     cBuoy       = 0.015,    // buoyancy multiplier
     cSink       = 0.01,     // smoke sinking
     tAmb        = 300,      // ambient temperature
-    tMax        = 6000,     // maximum temperature
-    cCooling    = 1200,     // cooling factor
-    vortEps     = 5.0;     // vorticity confinement
+    tMax        = 8000,     // maximum temperature
+    cCooling    = 1400,     // cooling factor
+    vortEps     = 10.0;     // vorticity confinement
 
 __constant int3 dx = {1, 0, 0},
                 dy = {0, 1, 0},
@@ -193,8 +193,10 @@ void __kernel reaction(
         if (fabs(pos.x - ex.x) < ex.w
          && fabs(pos.y - ex.y) < ex.w
          && fabs(pos.z - ex.z) < ex.w) {
-            f.x = 3000.0;
-            f.y = 2;
+            float d = distance(convert_float3(pos), ex.xyz);
+
+            f.x = 3000.0 * exp(-d*d / (10*ex.w));
+            f.y = 3;
         }
     }
 

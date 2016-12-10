@@ -1,13 +1,13 @@
 SimParam {
-    grid 64
-    dt 0.04
-    nsteps 100
+    grid 128
+    dt 0.02
+    nsteps 300
     walls 0
 }
 
 Camera {
     pos 0.5 0.5 -10
-    size 256 256
+    size 400 400
 }
 
 Light {
