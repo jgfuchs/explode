@@ -22,25 +22,22 @@ struct SimParams {
 
 struct Camera {
     Camera() :
-        pos({0, 0, -10}),
-        center({0, 0, 0}),
-        up({0, 1, 0}),
-        width(600),
-        height(600) {}
+        pos({0.5, 0.5, -5.0}),
+        size({256, 256}) {}
 
-    cl_float3 pos, center, up;
-    cl_uint width, height;
-    cl_float _1, _2;        // padding
+    cl_float3 pos;
+    cl_uint2 size;
+    cl_float _1, _2;    // pad to 32 bytes
 } __attribute__ ((packed));
 
 struct Light {
     Light() :
-        pos({1, 10, 0}),
-        intensity(1) {}
+        pos({1.0, 1.0, 0}),
+        intensity(10) {}
 
     cl_float3 pos;
     cl_float intensity;
-    cl_float _1, _2, _3;    // padding
+    cl_float _1, _2, _3;    // pad to 32 bytes
 } __attribute__ ((packed));
 
 struct Explosion {

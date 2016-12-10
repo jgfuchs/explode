@@ -71,17 +71,14 @@ void Scene::parseCamera() {
         auto tok = getToken();
         if (tok == "pos") {
             cam.pos = getFloat3();
-        } else if (tok == "center") {
-            cam.center = getFloat3();
-        } else if (tok == "up") {
-            cam.up = getFloat3();
         } else if (tok == "size") {
-            cam.width = getInt();
-            cam.height = getInt();
-            if (cam.width % 16 || cam.height % 16) {
+            unsigned x = getInt(),
+                     y = getInt();
+            if (x % 16 || y % 16) {
                 std::cerr << "Error: image dimensions must be multiple of 16\n";
                 exit(1);
             }
+            cam.size = {x, y};
         } else if (tok == "}") {
             break;
         } else {

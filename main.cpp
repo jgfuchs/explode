@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
     Scene scene(argv[1]);
     Simulation sim(&scene, true);
 
-    HostImage img(scene.cam.width, scene.cam.height);
+    HostImage img(scene.cam.size.x, scene.cam.size.y);
     for (int i = 0; i < scene.params.nsteps; i++) {
         sim.advance();
         sim.render(img);

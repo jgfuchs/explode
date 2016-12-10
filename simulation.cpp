@@ -35,8 +35,8 @@ float Simulation::getT() {
 }
 
 void Simulation::render(HostImage &img) {
-    int w = scene->cam.width,
-        h = scene->cam.height;
+    int w = scene->cam.size.x,
+        h = scene->cam.size.y;
 
     // render to target image
     kRender.setArg(0, scene->cam);
@@ -103,7 +103,7 @@ void Simulation::initOpenCL() {
 
     // create render target
     target = cl::Image2D(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
-        scene->cam.width, scene->cam.height);
+        scene->cam.size.x, scene->cam.size.y);
 }
 
 void Simulation::initProfiling() {

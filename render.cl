@@ -1,13 +1,16 @@
 
 struct Camera {
-    float3 pos, center, up;
-    uint width, height;
+    float3 pos;
+    uint2 size;
 };
 
 struct Light {
     float3 pos;
     float intensity;
 };
+
+#define RHO_EPS     0.001f
+#define TX_EPS      0.01f
 
 void __kernel render(
     const struct Camera cam,
@@ -23,16 +26,10 @@ void __kernel render(
     const float maxDist = sqrt(3.0f);
     const float scale = maxDist / nsamp;
     const float lscale = maxDist / nlsamp;
-    const float absorption = 10.0;
-    const float lightLum = 60.0;
-    const float rhoEps = 0.001;
-    const float txEps = 0.01;
+    const float absorption = 15.0;
 
-    const float3 eyePos = {0.5, 0.5, -10.0};
-    const float3 lightPos = {1.0, 2.0, 0.2};
-
-    float3 pos = {1.0f*imgPos.x/cam.width, 1.0f*imgPos.y/cam.height, 0};
-    float3 dir = normalize(pos - eyePos) * scale;
+    float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
+    float3 dir = normalize(pos - cam.pos) * scale;
 
     float tx = 1.0;
     float Lo = 0.0;
@@ -40,23 +37,23 @@ void __kernel render(
     int i, j;
     for (i = 0; i < nsamp; i++) {
         float rho = read_imagef(T, samp_n, pos).y;
-        if (rho > rhoEps) {
+        if (rho > RHO_EPS) {
             tx *= 1.0f - rho * scale * absorption;
-            if (tx < txEps) break;
+            if (tx < TX_EPS) break;
 
-            float3 ldir = normalize(lightPos - pos) * scale;
+            float3 ldir = normalize(light.pos - pos) * scale;
             float3 lpos = pos + ldir;
-            float txl = 1.0 / 10;
+            float txl = 1.0f;
 
             for (j = 0; j < nlsamp; j++) {
                 float lrho = read_imagef(T, samp_n, lpos).y;
-                txl *= 1.0 - lrho * scale * absorption;
-                if (txl < txEps) break;
+                txl *= 1.0f - lrho * scale * absorption;
+                if (txl < TX_EPS) break;
 
                 lpos += ldir;
             }
 
-            float Li = lightLum * txl;
+            float Li = light.intensity * txl;
             Lo += Li * tx * rho * scale;
         }
 
@@ -68,7 +65,7 @@ void __kernel render(
     uint4 color = {0, 0, 0, 255};
     color.xyz = convert_uint3(l*255);
 
-    write_imageui(img, (int2)(imgPos.x, cam.height-1-imgPos.y), color);
+    write_imageui(img, (int2)(imgPos.x, cam.size.y-1-imgPos.y), color);
 }
 
 
@@ -80,7 +77,7 @@ void __kernel render_slice(
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
-    float2 fpos = convert_float2(pos) * get_image_width(T) / cam.width;
+    float2 fpos = convert_float2(pos) * get_image_width(T) / cam.size.x;
 
     float4 sp = (float4)(fpos, 32, 0);
     uint b = read_imageui(B, samp_f, sp).x;
@@ -92,5 +89,5 @@ void __kernel render_slice(
         color.xyz = (uint3)(255, 128, 0);
     }
 
-    write_imageui(img, (int2)(pos.x, cam.height-1-pos.y), color);
+    write_imageui(img, (int2)(pos.x, cam.size.y-1-pos.y), color);
 }
