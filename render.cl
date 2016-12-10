@@ -24,11 +24,11 @@ void __kernel render(
     const float scale = maxDist / nsamp;
     const float lscale = maxDist / nlsamp;
     const float absorption = 10.0;
-    const float lightLum = 100.0;
+    const float lightLum = 60.0;
     const float rhoEps = 0.001;
     const float txEps = 0.01;
 
-    const float3 eyePos = {0.5, 0.5, -5.0};
+    const float3 eyePos = {0.5, 0.5, -10.0};
     const float3 lightPos = {1.0, 2.0, 0.2};
 
     float3 pos = {1.0f*imgPos.x/cam.width, 1.0f*imgPos.y/cam.height, 0};
@@ -63,8 +63,10 @@ void __kernel render(
         pos += dir;
     }
 
+    float3 l = Lo + tx*(float3)(.5, .5, .9);
+
     uint4 color = {0, 0, 0, 255};
-    color.xyz = convert_uint3((float3)(Lo*255));
+    color.xyz = convert_uint3(l*255);
 
     write_imageui(img, (int2)(imgPos.x, cam.height-1-imgPos.y), color);
 }

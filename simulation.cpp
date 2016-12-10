@@ -4,7 +4,7 @@
 #include "clerror.h"
 
 Simulation::Simulation(Scene *sc, bool prof) :
-    scene(sc), prms(sc->params), profiling(prof), t(0.0)
+    scene(sc), profiling(prof), dt(sc->params.dt), N(sc->params.grid_n), t(0.0)
 {
     try {
         initOpenCL();
@@ -27,7 +27,7 @@ void Simulation::advance() {
     // fire & dangerous things
     reaction();
 
-    t += prms.dt;
+    t += dt;
 }
 
 float Simulation::getT() {
@@ -88,20 +88,18 @@ void Simulation::initOpenCL() {
     kSetBounds = cl::Kernel(program, "set_bounds");
     kRender = cl::Kernel(program, "render");
 
-    int w = prms.grid_w, h = prms.grid_h, d = prms.grid_d;
-
     // create buffers
-    U = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-    U_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-    T = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-    T_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
-    B = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_UNSIGNED_INT8), w, h, d);
+    U = makeGrid3D(3);
+    U_tmp = makeGrid3D(3);
+    T = makeGrid3D(3);
+    T_tmp = makeGrid3D(3);
+    B = makeGrid3D(1, CL_UNSIGNED_INT8);
 
-    P = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-    P_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-    Dvg = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-    Dvg_tmp = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_R, CL_FLOAT), w, h, d);
-    Curl = cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), w, h, d);
+    P = makeGrid3D(1);
+    P_tmp = makeGrid3D(1);
+    Dvg = makeGrid3D(1);
+    Dvg_tmp = makeGrid3D(1);
+    Curl = makeGrid3D(3);
 
     // create render target
     target = cl::Image2D(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_UNSIGNED_INT8),
@@ -120,18 +118,17 @@ void Simulation::initGrid() {
     auto objs = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
         sizeof(Object) * nobjs, (void *)scene->objects.data());
 
-    kInitGrid.setArg(0, prms.walls);
+    kInitGrid.setArg(0, scene->params.walls);
     kInitGrid.setArg(1, nobjs-1);
     kInitGrid.setArg(2, objs);
     kInitGrid.setArg(3, U);
     kInitGrid.setArg(4, T);
     kInitGrid.setArg(5, B);
     enqueueGrid(kInitGrid);
-    profile(INIT_GRID);
 }
 
 void Simulation::advect() {
-    kAdvect.setArg(0, prms.dt);
+    kAdvect.setArg(0, dt);
     kAdvect.setArg(1, U);
     kAdvect.setArg(2, T);
     kAdvect.setArg(3, U_tmp);
@@ -150,7 +147,7 @@ void Simulation::addForces() {
     enqueueGrid(kCurl);
     profile(CURL);
 
-    kAddForces.setArg(0, prms.dt);
+    kAddForces.setArg(0, dt);
     kAddForces.setArg(1, U);
     kAddForces.setArg(2, T);
     kAddForces.setArg(3, Curl);
@@ -166,13 +163,13 @@ void Simulation::reaction() {
     if (t > .1 && !done) {
         done = true;
 
-        p.y = 10;// + randf()*0.5;
-        p.x = 32;//+ std::sin(2*t);
-        p.z = 32; //std::sin(.8*t) * 12;
+        p.y = 10;
+        p.x = 32;
+        p.z = 32;
         p.w = t;
     }
 
-    kReaction.setArg(0, prms.dt);
+    kReaction.setArg(0, dt);
     kReaction.setArg(1, T);
     kReaction.setArg(2, T_tmp);
     kReaction.setArg(3, p);
@@ -224,10 +221,28 @@ void Simulation::setBounds() {
     std::swap(T, T_tmp);
 }
 
-inline void Simulation::enqueueGrid(cl::Kernel kernel) {
+cl::Image3D Simulation::makeGrid3D(int ncomp, int dtype) {
+    int ch;
+    switch (ncomp) {
+    case 1:
+        ch = CL_R;
+        break;
+    case 3:
+    case 4:
+        ch = CL_RGBA;
+        break;
+    default:
+        std::cerr << "Error: " << ncomp << "-component image not supported\n";
+        exit(1);
+    }
+
+    return cl::Image3D(context, CL_MEM_READ_WRITE, cl::ImageFormat(ch, dtype), N, N, N);
+}
+
+void Simulation::enqueueGrid(cl::Kernel kernel) {
     queue.enqueueNDRangeKernel(kernel,
         cl::NullRange,          // 0 offset
-        cl::NDRange(prms.grid_w, prms.grid_h, prms.grid_w), // global size
+        cl::NDRange(N, N, N),   // global size
         cl::NDRange(8, 8, 8),   // local (workgroup) size
         NULL, &event);
 }
@@ -247,8 +262,8 @@ void Simulation::dumpProfiling() {
     std::cout << "\n";
     if (profiling) {
 
-        static const std::string kernelNames[_LAST] = { "initGrid", "advect",
-            "curl", "addForces", "reaction", "divergence", "jacobi", "project",
+        static const std::string kernelNames[_LAST] = { "advect", "curl",
+            "addForces", "reaction", "divergence", "jacobi", "project",
             "setBounds", "render"};
 
         std::cout << "\n\nProfiling info:\n";

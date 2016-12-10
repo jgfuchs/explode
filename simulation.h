@@ -34,12 +34,14 @@ private:
     void setBounds();
 
     // helper functions
+    cl::Image3D makeGrid3D(int ncomp, int dtype=CL_FLOAT);
     void enqueueGrid(cl::Kernel k);
     void profile(int pk);
 
     const Scene *scene;
-    const SimParams prms;   // slightly more convenient access
-    bool profiling;
+    const bool profiling;
+    const float dt;
+    const unsigned N;
     float t;
 
     // OpenCL management
@@ -66,8 +68,8 @@ private:
     cl::Image2D target;         // render target
 
     // profiling
-    enum {INIT_GRID, ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI,
-        PROJECT, SET_BOUNDS, RENDER, _LAST};
+    enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
+        SET_BOUNDS, RENDER, _LAST};
 
     double kernelTimes[_LAST];
     unsigned kernelCalls[_LAST];

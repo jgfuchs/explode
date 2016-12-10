@@ -195,7 +195,7 @@ void __kernel reaction(
         if (d < radius) {
             float a = min(radius - d, 1.0f);
             f.x = 3000.0 * a;
-            f.y = a;
+            f.y = 2*a;
         }
     }
 
