@@ -142,10 +142,10 @@ void Scene::parseObject() {
     expect("{");
     while (true) {
         auto tok = getToken();
-        if (tok == "pos0") {
-            obj.pos0 = getFloat3();
-        } else if (tok == "pos1") {
-            obj.pos1 = getFloat3();
+        if (tok == "pos") {
+            obj.pos = getFloat3();
+        } else if (tok == "dim") {
+            obj.dim = getFloat3();
         } else if (tok == "}") {
             break;
         } else {

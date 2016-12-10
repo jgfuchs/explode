@@ -25,9 +25,10 @@ void __kernel render(
     const float lscale = maxDist / nlsamp;
     const float absorption = 10.0;
     const float lightLum = 100.0;
-    const float rhoEps = 0.0001;
+    const float rhoEps = 0.001;
+    const float txEps = 0.01;
 
-    const float3 eyePos = {0.5, 0.5, -1.0};
+    const float3 eyePos = {0.5, 0.5, -5.0};
     const float3 lightPos = {1.0, 2.0, 0.2};
 
     float3 pos = {1.0f*imgPos.x/cam.width, 1.0f*imgPos.y/cam.height, 0};
@@ -41,7 +42,7 @@ void __kernel render(
         float rho = read_imagef(T, samp_n, pos).y;
         if (rho > rhoEps) {
             tx *= 1.0f - rho * scale * absorption;
-            if (tx < 0.01f) break;
+            if (tx < txEps) break;
 
             float3 ldir = normalize(lightPos - pos) * scale;
             float3 lpos = pos + ldir;
@@ -50,7 +51,7 @@ void __kernel render(
             for (j = 0; j < nlsamp; j++) {
                 float lrho = read_imagef(T, samp_n, lpos).y;
                 txl *= 1.0 - lrho * scale * absorption;
-                if (txl < 0.01) break;
+                if (txl < txEps) break;
 
                 lpos += ldir;
             }

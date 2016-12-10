@@ -21,7 +21,7 @@ Explosion {
     t0 0.1
 }
 
-# Object {
-#    pos0 26 32 26
-#    pos1 38 44 38
-# }
+Object {
+   pos 26 38 26
+   dim 12 12 12
+}

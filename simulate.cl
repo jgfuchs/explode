@@ -1,6 +1,6 @@
 
 struct Object {
-    float3 pos0, pos1;
+    float3 pos, dim;
 };
 
 struct Explosion {
@@ -47,12 +47,6 @@ inline float4 ix(image3d_t img, int3 c) {
     return read_imagef(img, samp_i, c);
 }
 
-inline bool inObj(float3 p0, float3 p1, float3 pos) {
-    return pos.x >= p0.x && pos.x <= p1.x
-        && pos.y >= p0.y && pos.y <= p1.y
-        && pos.z >= p0.z && pos.z <= p1.z;
-}
-
 void __kernel init_grid(
     uint walls,
     uint nobjs,
@@ -82,11 +76,11 @@ void __kernel init_grid(
 
     // voxelize objects
     for (int i = 0; i < nobjs; i++) {
-        float3 p0 = objects[i].pos0;
-        float3 p1 = objects[i].pos1;
-        if (pos.x >= p0.x && pos.x <= p1.x
-         && pos.y >= p0.y && pos.y <= p1.y
-         && pos.z >= p0.z && pos.z <= p1.z)
+        float3 p = objects[i].pos;
+        float3 dim = objects[i].dim;
+        if (pos.x >= p.x && pos.x <= p.x+dim.x
+         && pos.y >= p.y && pos.y <= p.y+dim.y
+         && pos.z >= p.z && pos.z <= p.z+dim.z)
          {
              b = 1;
          }
