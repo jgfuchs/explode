@@ -1,13 +1,4 @@
 
-struct Object {
-    float3 pos, dim;
-};
-
-struct Explosion {
-    float3 pos;
-    float size, t0;
-};
-
 // for reading exact int coords
 __constant sampler_t samp_i =
     CLK_NORMALIZED_COORDS_FALSE |
@@ -29,32 +20,42 @@ __constant sampler_t samp_n =
 // convention: c* = coefficient, t* = temperature, r* = rate
 __constant const float
     // general constants
-    h           = 0.25,     // cell side length
+    h           = 0.25,     // cell side length (m)
     hinv        = 1.0f/h,   // cells per unit length
-    grav        = 9.8,      // acceleration due to gravity
+    grav        = 9.8,      // acceleration due to gravity (m/s^2)
     cVort       = 10.0,     // vorticity confinement
-    // thermodynamics
-    cBuoy       = 0.06*h,   // buoyancy multiplier
-    cSink       = 0.01,     // smoke sinking
+    // heat-related
+    cBuoy       = 0.02*h,   // buoyancy multiplier
+    cSink       = 0.2,      // smoke sinking
     cCooling    = 1400,     // cooling
-    tAmb        = 300,      // ambient temperature
-    tMax        = 8000,     // "maximum" temperature
-    // combustion
-    tIgnite     = 800,      // (auto)ignition temperature
-    rBurn       = 0.05,     // fuel burn rate
-    rHeat       = 40,       // heat production rate
-    rSmoke      = 4.0,     // smoke/soot production rate
-    rDvg        = 75.0;      // added divergence
+    tAmb        = 300,      // ambient temperature (K)
+    tMax        = 8000,     // "maximum" temperature (K)
+    // combustion-related
+    tIgnite     = 500,      // (auto)ignition temperature (K)
+    rBurn       = 4,        // fuel burn rate (amt/sec)
+    rHeat       = 700,      // heat production rate (K/s/fuel)
+    rSmoke      = 1,        // smoke/soot production rate
+    rDvg        = 9;        // extra divergence = "explosiveness"
 
 
 __constant int3 dx = {1, 0, 0},
                 dy = {0, 1, 0},
                 dz = {0, 0, 1};
 
+struct Object {
+    float3 pos, dim;
+};
+
+struct Explosion {
+    float3 pos;
+    float size, t0;
+};
+
 // lookup value at coordinate (i, j, k) in image
 inline float4 ix(image3d_t img, int3 c) {
     return read_imagef(img, samp_i, c);
 }
+
 
 void __kernel init_grid(
     uint walls,
@@ -67,11 +68,14 @@ void __kernel init_grid(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     write_imagef(U, pos, (float4)(0));
 
-    float d = distance((float3)(32, 12, 32), convert_float3(pos));
+    // add explosion
+    float d = distance((float3)(32, 10, 32), convert_float3(pos));
     float4 f = {tAmb, 0, 0, 0};
-    if (d < 6) {
-        f.z = 4;
-        f.x = 1000;
+    float exr = 5.0f;
+    if (d < exr) {
+        float a = min(exr - d, 1.0f);
+        f.z = a;
+        f.x = 2000 * a;
     }
     write_imagef(T, pos, f);
 
@@ -130,7 +134,7 @@ void __kernel curl(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     int i = pos.x, j = pos.y, k = pos.z;
 
-    // prefetch to avoid unecessary lookups
+    // "prefetch" to avoid unecessary lookups
     float4 x1 = ix(U, pos + dx);
     float4 x2 = ix(U, pos - dx);
     float4 y1 = ix(U, pos + dy);
@@ -206,12 +210,12 @@ void __kernel reaction(
     // combustion
     float dvg = 0;
     if (f.x > tIgnite && f.z > 0.0f) {
-        float df = f.z * rBurn;
+        float df = min(f.z, rBurn * dt);
 
-        f.x += rHeat * df * dt;
-        f.y += rSmoke * df * dt;
+        f.x += rHeat * df;
+        f.y += rSmoke * df;
         f.z -= df;
-        dvg = rDvg * df * dt;
+        dvg = rDvg * df;
     }
 
     write_imagef(T_out, pos, f);

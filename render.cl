@@ -26,7 +26,7 @@ void __kernel render(
     const float maxDist = sqrt(3.0f);   // cube diagonal
     const float ds = maxDist / nsamp;   // main ray step size
     const float dsl = maxDist / nlsamp; // light ray step size
-    const float absorption = 40.0;
+    const float absorption = 30.0;
 
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
     float3 dir = normalize(pos - cam.pos) * ds;
@@ -108,21 +108,20 @@ void __kernel render_slice(
     float2 fpos = convert_float2(pos) * get_image_width(T) / cam.size.x;
     float4 sp = (float4)(fpos, 32, 0);
     uint b = read_imageui(B, samp_f, sp).x;
-    float4 samp = read_imagef(T, samp_f, sp);
     uint4 color = {0, 0, 0, 255};
 
-    // DEBUG: temperature
-    float t = samp.x / 20.0f;
-    color.xyz = convert_uint3((float3)(t));
+    float4 samp = read_imagef(T, samp_f, sp);
 
-    // DEBUG: smoke
-    // float s = clamp(samp.y*400, 0.0f, 255.0f);
-    // color.xyz = 255 - convert_uint3((float3)(s));
+    // temperature
+    color.x = (int)(8.0f * samp.x / 3000.0f) * 32;
 
-    // DEBUG: fuel
-    // float f = clamp(sampz*255.0f, 0.0f, 255.0f);
-    // color.xyz = convert_uint3((float3)(f));
+    // smoke
+    // color.xyz = convert_uint3((float3)(samp.y*200));
 
+    // fuel
+    // color.y = (int) 255 * samp.z;
+
+    // mark walls
     if (b > 0) {
         color.xyz = (uint3)(255, 128, 0);
     }

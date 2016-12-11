@@ -39,8 +39,8 @@ int main(int argc, char *argv[]) {
     int nsteps = scene.params.nsteps;
     auto t0 = time_now();
     for (int i = 0; i < nsteps; i++) {
-        sim.advance();
         sim.render(img);
+        sim.advance();
         saveImage(img, i);
 
         printStatus(i, nsteps, sim.getT());

@@ -84,7 +84,6 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
-
     kRender = cl::Kernel(program, "render_slice");
 
     // create buffers

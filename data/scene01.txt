@@ -7,7 +7,7 @@ SimParam {
 }
 
 Camera {
-    pos 0.5 0.5 -10
+    pos 0.5 0.5 -15
     size 256 256
 }
 
@@ -20,8 +20,8 @@ Explosion {
     t0 0.1
 }
 
-#
-# Object {
-#    pos 26 38 26
-#    dim 12 12 12
-# }
+
+Object {
+   pos 0 0 0
+   dim 64 1 64
+}
