@@ -158,8 +158,8 @@ void Simulation::reaction() {
     cl_float4 p = {0, 0, 0, 0};
     if (t > .1 && !done) {
         done = true;
-        // p = {32, 10, 32, 8};
-        p = {64, 22, 64, 12};
+        p = {32, 10, 32, 8};
+        // p = {64, 22, 64, 12};
     }
 
     kReaction.setArg(0, dt);
@@ -225,7 +225,7 @@ cl::Image3D Simulation::makeGrid3D(int ncomp, int dtype) {
         ch = CL_RGBA;
         break;
     default:
-        std::cerr << "Error: " << ncomp << "-component image not supported\n";
+        std::cerr << "Error: " << ncomp << "-component images not supported\n";
         exit(1);
     }
 

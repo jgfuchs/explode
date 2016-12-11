@@ -12,7 +12,7 @@
 \usepackage{sectsty}
 \sectionfont{\fontsize{14}{15}\selectfont}
 \subsectionfont{\normalsize}
-\setkeys{Gin}{width=\linewidth}
+% \setkeys{Gin}{width=\linewidth}
 \end_preamble
 \use_default_options true
 \maintain_unincluded_children false
