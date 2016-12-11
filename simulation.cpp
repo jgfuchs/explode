@@ -82,6 +82,7 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
+
     kRender = cl::Kernel(program, "render");
 
     // create buffers
@@ -121,6 +122,10 @@ void Simulation::initGrid() {
     kInitGrid.setArg(4, T);
     kInitGrid.setArg(5, B);
     enqueueGrid(kInitGrid);
+}
+
+void Simulation::initRender() {
+
 }
 
 void Simulation::advect() {

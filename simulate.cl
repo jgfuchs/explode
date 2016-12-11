@@ -276,4 +276,5 @@ void __kernel set_bounds(
     write_imagef(T_out, pos, t);
 }
 
+
 #include "render.cl"
