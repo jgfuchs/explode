@@ -43,8 +43,8 @@ __constant const float
     tIgnite     = 800,      // (auto)ignition temperature
     rBurn       = 0.05,     // fuel burn rate
     rHeat       = 40,       // heat production rate
-    rSmoke      = 5.75,     // smoke/soot production rate
-    rDvg        = 100.0;      // added divergence
+    rSmoke      = 4.0,     // smoke/soot production rate
+    rDvg        = 75.0;      // added divergence
 
 
 __constant int3 dx = {1, 0, 0},
@@ -67,9 +67,9 @@ void __kernel init_grid(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     write_imagef(U, pos, (float4)(0));
 
-    float d = distance((float3)(32, 20, 32), convert_float3(pos));
+    float d = distance((float3)(32, 12, 32), convert_float3(pos));
     float4 f = {tAmb, 0, 0, 0};
-    if (d < 8) {
+    if (d < 6) {
         f.z = 4;
         f.x = 1000;
     }

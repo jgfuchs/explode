@@ -26,7 +26,7 @@ void __kernel render(
     const float maxDist = sqrt(3.0f);   // cube diagonal
     const float ds = maxDist / nsamp;   // main ray step size
     const float dsl = maxDist / nlsamp; // light ray step size
-    const float absorption = 50.0;
+    const float absorption = 40.0;
 
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
     float3 dir = normalize(pos - cam.pos) * ds;
@@ -95,4 +95,37 @@ void __kernel gen_spectra(
     float temp = tMax * pos / get_global_size(0);
 
     write_imagef(S, pos, 0.0f);
+}
+
+void __kernel render_slice(
+    const struct Camera cam,
+    const struct Light light,
+    __read_only image3d_t T,
+    __read_only image3d_t B,
+    __write_only image2d_t img)
+{
+    int2 pos = {get_global_id(0), get_global_id(1)};
+    float2 fpos = convert_float2(pos) * get_image_width(T) / cam.size.x;
+    float4 sp = (float4)(fpos, 32, 0);
+    uint b = read_imageui(B, samp_f, sp).x;
+    float4 samp = read_imagef(T, samp_f, sp);
+    uint4 color = {0, 0, 0, 255};
+
+    // DEBUG: temperature
+    float t = samp.x / 20.0f;
+    color.xyz = convert_uint3((float3)(t));
+
+    // DEBUG: smoke
+    // float s = clamp(samp.y*400, 0.0f, 255.0f);
+    // color.xyz = 255 - convert_uint3((float3)(s));
+
+    // DEBUG: fuel
+    // float f = clamp(sampz*255.0f, 0.0f, 255.0f);
+    // color.xyz = convert_uint3((float3)(f));
+
+    if (b > 0) {
+        color.xyz = (uint3)(255, 128, 0);
+    }
+
+    write_imageui(img, (int2)(pos.x, cam.size.y-1-pos.y), color);
 }

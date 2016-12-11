@@ -85,7 +85,7 @@ void Simulation::initOpenCL() {
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
 
-    kRender = cl::Kernel(program, "render");
+    kRender = cl::Kernel(program, "render_slice");
 
     // create buffers
     U = makeGrid3D(3);
