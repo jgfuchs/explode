@@ -25,7 +25,7 @@ private:
     void initOpenCL();
     void initProfiling();
     void initGrid();
-    void initRender();
+    void initRenderer();
 
     // fluid dynamics
     void advect();

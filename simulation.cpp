@@ -10,6 +10,7 @@ Simulation::Simulation(Scene *sc, bool prof) :
         initOpenCL();
         initProfiling();
         initGrid();
+        initRenderer();
     } catch (cl::Error err) {
         std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
         exit(1);
@@ -23,6 +24,7 @@ void Simulation::advance() {
     project();
     advect();
     project();
+
     t += dt;
 }
 
@@ -124,7 +126,7 @@ void Simulation::initGrid() {
     enqueueGrid(kInitGrid);
 }
 
-void Simulation::initRender() {
+void Simulation::initRenderer() {
 
 }
 
@@ -159,18 +161,10 @@ void Simulation::addForces() {
 }
 
 void Simulation::reaction() {
-    static bool done = false;
-    cl_float4 p = {0, 0, 0, 0};
-    if (t > .1 && !done) {
-        done = true;
-        p = {32, 10, 32, 8};
-        // p = {64, 22, 64, 12};
-    }
-
     kReaction.setArg(0, dt);
     kReaction.setArg(1, T);
     kReaction.setArg(2, T_tmp);
-    kReaction.setArg(3, p);
+    kReaction.setArg(3, Dvg);
     enqueueGrid(kReaction);
     profile(REACTION);
     std::swap(T, T_tmp);
@@ -181,9 +175,11 @@ void Simulation::project() {
     // (also zeroes out P)
     kDivergence.setArg(0, U);
     kDivergence.setArg(1, Dvg);
-    kDivergence.setArg(2, P);
+    kDivergence.setArg(2, Dvg_tmp);
+    kDivergence.setArg(3, P);
     enqueueGrid(kDivergence);
     profile(DIVERGENCE);
+    std::swap(Dvg, Dvg_tmp);
 
     // solve laplace(P) = div(U) for P
     // this where we spend ~75% of GPU time

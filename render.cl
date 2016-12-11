@@ -26,7 +26,7 @@ void __kernel render(
     const float maxDist = sqrt(3.0f);   // cube diagonal
     const float ds = maxDist / nsamp;   // main ray step size
     const float dsl = maxDist / nlsamp; // light ray step size
-    const float absorption = 20.0;
+    const float absorption = 50.0;
 
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
     float3 dir = normalize(pos - cam.pos) * ds;
@@ -56,14 +56,14 @@ void __kernel render(
             }
 
             float Li = light.intensity * txl;
-            float3 Le = (float3)(1.0, 0.65, 0.1) * 100 * (temp - tAmb) / tMax;
+            float3 Le = (float3)(1.0, 0.65, 0.0) * 60 * (temp - tAmb) / tMax;
             Lo += (Li + Le) * tx * rho * ds;
         }
 
         pos += dir;
     }
 
-    float3 bg = {0.2, 0.2, 0.4};
+    float3 bg = {0.5, 0.5, 0.9};
     // if (pos.y < 0.0f) {
     //     bg = (float3)(0.5, 0.25, 0.0);
     //     if (tx > 4.0f*TX_EPS) {
@@ -91,6 +91,8 @@ void __kernel render(
 void __kernel gen_spectra(
     __write_only image1d_t S)
 {
-    float temp = tMax * get_global_id(0) / get_global_size(0);
+    int pos = get_global_id(0);
+    float temp = tMax * pos / get_global_size(0);
 
+    write_imagef(S, pos, 0.0f);
 }

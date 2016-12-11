@@ -26,17 +26,26 @@ __constant sampler_t samp_n =
     CLK_ADDRESS_CLAMP |
     CLK_FILTER_LINEAR;
 
-// physics constants
+// convention: c* = coefficient, t* = temperature, r* = rate
 __constant const float
+    // general constants
     h           = 0.25,     // cell side length
-    rh          = 1.0f/h,   // cells per unit length
+    hinv        = 1.0f/h,   // cells per unit length
     grav        = 9.8,      // acceleration due to gravity
-    cBuoy       = 0.015,    // buoyancy multiplier
+    cVort       = 10.0,     // vorticity confinement
+    // thermodynamics
+    cBuoy       = 0.06*h,   // buoyancy multiplier
     cSink       = 0.01,     // smoke sinking
+    cCooling    = 1400,     // cooling
     tAmb        = 300,      // ambient temperature
-    tMax        = 8000,     // maximum temperature
-    cCooling    = 1400,     // cooling factor
-    vortEps     = 10.0;     // vorticity confinement
+    tMax        = 8000,     // "maximum" temperature
+    // combustion
+    tIgnite     = 800,      // (auto)ignition temperature
+    rBurn       = 0.05,     // fuel burn rate
+    rHeat       = 40,       // heat production rate
+    rSmoke      = 5.75,     // smoke/soot production rate
+    rDvg        = 100.0;      // added divergence
+
 
 __constant int3 dx = {1, 0, 0},
                 dy = {0, 1, 0},
@@ -57,7 +66,14 @@ void __kernel init_grid(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     write_imagef(U, pos, (float4)(0));
-    write_imagef(T, pos, (float4)(tAmb, 0, 0, 0));
+
+    float d = distance((float3)(32, 20, 32), convert_float3(pos));
+    float4 f = {tAmb, 0, 0, 0};
+    if (d < 8) {
+        f.z = 4;
+        f.x = 1000;
+    }
+    write_imagef(T, pos, f);
 
     int nx = get_image_width(B),
         ny = get_image_height(B),
@@ -100,7 +116,7 @@ void __kernel advect(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float3 fpos = convert_float3(pos) + 0.5f;
-    float3 p0 = fpos - dt * rh * read_imagef(U, pos).xyz;
+    float3 p0 = fpos - dt * hinv * read_imagef(U, pos).xyz;
 
     write_imagef(U_out, pos, read_imagef(U, samp_f, p0));
     write_imagef(T_out, pos, read_imagef(T, samp_f, p0));
@@ -129,7 +145,7 @@ void __kernel curl(
         0
     };
 
-    curl.xyz *= 0.5f * rh;
+    curl.xyz *= 0.5f * hinv;
     curl.w = length(curl.xyz);
 
     write_imagef(Curl, pos, curl);
@@ -156,18 +172,15 @@ void __kernel add_forces(
     f.y -= cSink * grav * therm.y;
 
     // vorticity confinement
-    {
-        // eta = norm(grad(abs(curl(U))))
-        float3 eta = {
-            ix(Curl, pos + dx).w - ix(Curl, pos - dx).w,
-            ix(Curl, pos + dy).w - ix(Curl, pos - dy).w,
-            ix(Curl, pos + dz).w - ix(Curl, pos - dz).w,
-        };
-        eta = normalize(eta * 0.5f * rh);
-
-        // force = eps * (|eta| x curl U) * dh
-        f.xyz += vortEps * cross(eta, ix(Curl, pos).xyz) * h;
-    }
+    float3 eta = {
+        ix(Curl, pos + dx).w - ix(Curl, pos - dx).w,
+        ix(Curl, pos + dy).w - ix(Curl, pos - dy).w,
+        ix(Curl, pos + dz).w - ix(Curl, pos - dz).w,
+    };
+    // eta = norm(grad(abs(curl(U))))
+    eta = normalize(eta * 0.5f * hinv);
+    // force = eps * (|eta| x curl U) * dh
+    f.xyz += cVort * cross(eta, ix(Curl, pos).xyz) * h;
 
     float4 v = read_imagef(U, pos);
     v.xyz += dt * f;
@@ -179,43 +192,47 @@ void __kernel reaction(
     const float dt,
     __read_only image3d_t T,
     __write_only image3d_t T_out,
-    const float4 ex)
+    __write_only image3d_t Dvg)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+
+    // x = temperature, y = smoke, z = fuel
     float4 f = read_imagef(T, pos);
 
     // cooling
     float r  = (f.x - tAmb) / (tMax - tAmb);
     f.x = max(f.x - cCooling * pown(r, 4), tAmb);   // don't go below ambient
 
-    // heat & smoke source
-    if (ex.w > 0) {
-        if (fabs(pos.x - ex.x) < ex.w
-         && fabs(pos.y - ex.y) < ex.w
-         && fabs(pos.z - ex.z) < ex.w) {
-            float d = distance(convert_float3(pos), ex.xyz);
+    // combustion
+    float dvg = 0;
+    if (f.x > tIgnite && f.z > 0.0f) {
+        float df = f.z * rBurn;
 
-            f.x = 3000.0 * exp(-d*d / (10*ex.w));
-            f.y = 3;
-        }
+        f.x += rHeat * df * dt;
+        f.y += rSmoke * df * dt;
+        f.z -= df;
+        dvg = rDvg * df * dt;
     }
 
     write_imagef(T_out, pos, f);
+    write_imagef(Dvg, pos, (float4)(dvg, 0, 0, 0));
 }
 
 
 void __kernel divergence(
     __read_only image3d_t U,
-    __write_only image3d_t Dvg,
+    __read_only image3d_t Dvg,
+    __write_only image3d_t Dvg_out,
     __write_only image3d_t P)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
+    float d0 = read_imagef(Dvg, pos).x;
     float d = -0.5f * h *
          ((ix(U, pos + dx).x - ix(U, pos - dx).x)
         + (ix(U, pos + dy).y - ix(U, pos - dy).y)
         + (ix(U, pos + dz).z - ix(U, pos - dz).z));
-    write_imagef(Dvg, pos, d);
+    write_imagef(Dvg_out, pos, d0 + d);
 
     // avoid a call to enqueueFillImage by zeroing pressure field here
     write_imagef(P, pos, 0);
@@ -249,7 +266,7 @@ void __kernel project(
     };
 
     float3 vOld = read_imagef(U, pos).xyz;
-    float3 vNew = vOld - 0.5f * rh * gradP;
+    float3 vNew = vOld - 0.5f * hinv * gradP;
     write_imagef(U_out, pos, (float4)(vNew, 0));
 }
 
