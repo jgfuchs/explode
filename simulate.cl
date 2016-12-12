@@ -25,7 +25,7 @@ __constant const float
     grav        = 9.8,      // acceleration due to gravity (m/s^2)
     cVort       = 10.0,     // vorticity confinement
     // heat-related
-    cBuoy       = 0.02*h,   // buoyancy multiplier
+    cBuoy       = 0.015*h,   // buoyancy multiplier
     cSink       = 0.2,      // smoke sinking
     cCooling    = 1400,     // cooling
     tAmb        = 300,      // ambient temperature (K)
@@ -69,7 +69,7 @@ void __kernel init_grid(
     write_imagef(U, pos, (float4)(0));
 
     // add explosion
-    float d = distance((float3)(32, 10, 32), convert_float3(pos));
+    float d = distance((float3)(32, 20, 32), convert_float3(pos));
     float4 f = {tAmb, 0, 0, 0};
     float exr = 5.0f;
     if (d < exr) {
