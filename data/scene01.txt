@@ -17,8 +17,8 @@ Light {
 }
 
 Explosion {
-    pos 32 12 32
-    size 6
+    pos .5 .2 .5
+    size 0.1
     t0 0.2
 }
 

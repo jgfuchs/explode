@@ -225,7 +225,9 @@ void Simulation::addExplosion() {
     auto kAddExplosion = cl::Kernel(program, "add_explosion");
     kAddExplosion.setArg(0, scene->explosion);
     kAddExplosion.setArg(1, T);
+    kAddExplosion.setArg(2, T_tmp);
     enqueueGrid(kAddExplosion);
+    std::swap(T, T_tmp);
 }
 
 cl::Image3D Simulation::makeGrid3D(int ncomp, int dtype) {

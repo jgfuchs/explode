@@ -290,18 +290,21 @@ void __kernel set_bounds(
 
 void __kernel add_explosion(
     const struct Explosion ex,
-    __write_only image3d_t T)
+    __read_only image3d_t T,
+    __write_only image3d_t T_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
-    float4 f = {tAmb, 0, 0, 0};
-    float d = distance(ex.pos, convert_float3(pos));
+    float4 f = read_imagef(T, pos);
+
+    // explosion positions are normalized coords
+    float3 fpos = convert_float3(pos) / get_image_width(T);
+    float d = distance(ex.pos, fpos);
     if (d < ex.size) {
-        float a = min(ex.size - d, 1.0f);
-        f.z = a;
-        f.x = 2000 * a;
+        f.xyz = (float3)(2000, 0, 1);
     }
-    write_imagef(T, pos, f);
+
+    write_imagef(T_out, pos, f);
 }
 
 
