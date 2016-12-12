@@ -25,16 +25,16 @@ __constant const float
     grav        = 9.8,      // acceleration due to gravity (m/s^2)
     cVort       = 10.0,     // vorticity confinement
     // heat-related
-    cBuoy       = 0.015*h,   // buoyancy multiplier
-    cSink       = 0.2,      // smoke sinking
+    cBuoy       = 0.03*h,   // buoyancy multiplier
+    cSink       = 0.3,      // smoke sinking
     cCooling    = 1400,     // cooling
     tAmb        = 300,      // ambient temperature (K)
     tMax        = 6000,     // "maximum" temperature (K)
     // combustion-related
     tIgnite     = 500,      // (auto)ignition temperature (K)
-    rBurn       = 4,        // fuel burn rate (amt/sec)
-    rHeat       = 1400,      // heat production rate (K/s/fuel)
-    rSmoke      = 1,        // smoke/soot production rate
+    rBurn       = 3,        // fuel burn rate (amt/sec)
+    rHeat       = 1600,      // heat production rate (K/s/fuel)
+    rSmoke      = 1.0,        // smoke/soot production rate
     rDvg        = 16;        // extra divergence = "explosiveness"
 
 
