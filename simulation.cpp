@@ -18,6 +18,8 @@ Simulation::Simulation(Scene *sc, bool prof) :
 }
 
 void Simulation::advance() {
+    addExplosion();
+
     setBounds();
     addForces();
     reaction();
@@ -75,7 +77,6 @@ void Simulation::initOpenCL() {
     }
 
     // load kernels from the program
-    kInitGrid = cl::Kernel(program, "init_grid");
     kAdvect = cl::Kernel(program, "advect");
     kCurl = cl::Kernel(program, "curl");
     kAddForces = cl::Kernel(program, "add_forces");
@@ -84,6 +85,7 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
+    // kRender = cl::Kernel(program, "render_slice");
     kRender = cl::Kernel(program, "render");
 
     // create buffers
@@ -116,6 +118,7 @@ void Simulation::initGrid() {
     auto objs = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
         sizeof(Object) * nobjs, (void *)scene->objects.data());
 
+    auto kInitGrid = cl::Kernel(program, "init_grid");
     kInitGrid.setArg(0, scene->params.walls);
     kInitGrid.setArg(1, nobjs-1);
     kInitGrid.setArg(2, objs);
@@ -212,6 +215,17 @@ void Simulation::setBounds() {
 
     std::swap(U, U_tmp);
     std::swap(T, T_tmp);
+}
+
+void Simulation::addExplosion() {
+    static bool done = false;
+    if (done || t < scene->explosion.t0) return;
+    else done = true;
+
+    auto kAddExplosion = cl::Kernel(program, "add_explosion");
+    kAddExplosion.setArg(0, scene->explosion);
+    kAddExplosion.setArg(1, T);
+    enqueueGrid(kAddExplosion);
 }
 
 cl::Image3D Simulation::makeGrid3D(int ncomp, int dtype) {

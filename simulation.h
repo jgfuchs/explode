@@ -33,6 +33,7 @@ private:
     void reaction();
     void project();
     void setBounds();
+    void addExplosion();
 
     // helper functions
     cl::Image3D makeGrid3D(int ncomp, int dtype=CL_FLOAT);
@@ -51,8 +52,8 @@ private:
     cl::CommandQueue queue;
 
     // all kernel handles
-    cl::Kernel kInitGrid, kAdvect, kCurl, kAddForces, kReaction, kDivergence,
-        kJacobi, kProject, kSetBounds, kRender;
+    cl::Kernel kAdvect, kCurl, kAddForces, kReaction, kDivergence, kJacobi,
+        kProject, kSetBounds, kRender;
 
     cl::NDRange gridRange, groupRange;
 

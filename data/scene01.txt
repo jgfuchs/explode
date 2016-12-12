@@ -1,7 +1,7 @@
 SimParam {
     grid 64
-    dt 0.04
-    nsteps 100
+    dt 0.02
+    nsteps 200
     niters 30
     walls 0
 }
@@ -17,7 +17,9 @@ Light {
 }
 
 Explosion {
-    t0 0.1
+    pos 32 12 32
+    size 6
+    t0 0.2
 }
 
 Object {
@@ -25,12 +27,12 @@ Object {
    dim 64 1 64
 }
 
-Object {
-   pos 22 26 22
-   dim 20 4 20
-}
-
-Object {
-   pos 18 10 22
-   dim 4 16 20
-}
+# Object {
+#    pos 22 26 22
+#    dim 20 4 20
+# }
+#
+# Object {
+#    pos 18 10 22
+#    dim 4 16 20
+# }

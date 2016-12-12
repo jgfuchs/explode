@@ -29,13 +29,13 @@ __constant const float
     cSink       = 0.2,      // smoke sinking
     cCooling    = 1400,     // cooling
     tAmb        = 300,      // ambient temperature (K)
-    tMax        = 8000,     // "maximum" temperature (K)
+    tMax        = 6000,     // "maximum" temperature (K)
     // combustion-related
     tIgnite     = 500,      // (auto)ignition temperature (K)
     rBurn       = 4,        // fuel burn rate (amt/sec)
-    rHeat       = 700,      // heat production rate (K/s/fuel)
+    rHeat       = 1400,      // heat production rate (K/s/fuel)
     rSmoke      = 1,        // smoke/soot production rate
-    rDvg        = 9;        // extra divergence = "explosiveness"
+    rDvg        = 16;        // extra divergence = "explosiveness"
 
 
 __constant int3 dx = {1, 0, 0},
@@ -48,7 +48,7 @@ struct Object {
 
 struct Explosion {
     float3 pos;
-    float size, t0;
+    float size;
 };
 
 // lookup value at coordinate (i, j, k) in image
@@ -67,17 +67,7 @@ void __kernel init_grid(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     write_imagef(U, pos, (float4)(0));
-
-    // add explosion
-    float d = distance((float3)(32, 20, 32), convert_float3(pos));
-    float4 f = {tAmb, 0, 0, 0};
-    float exr = 5.0f;
-    if (d < exr) {
-        float a = min(exr - d, 1.0f);
-        f.z = a;
-        f.x = 2000 * a;
-    }
-    write_imagef(T, pos, f);
+    write_imagef(T, pos, (float4)(0));
 
     int nx = get_image_width(B),
         ny = get_image_height(B),
@@ -295,6 +285,23 @@ void __kernel set_bounds(
 
     write_imagef(U_out, pos, u);
     write_imagef(T_out, pos, t);
+}
+
+
+void __kernel add_explosion(
+    const struct Explosion ex,
+    __write_only image3d_t T)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+
+    float4 f = {tAmb, 0, 0, 0};
+    float d = distance(ex.pos, convert_float3(pos));
+    if (d < ex.size) {
+        float a = min(ex.size - d, 1.0f);
+        f.z = a;
+        f.x = 2000 * a;
+    }
+    write_imagef(T, pos, f);
 }
 
 

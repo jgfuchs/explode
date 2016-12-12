@@ -33,10 +33,6 @@ Scene::Scene(char *fname) : in(fname) {
 
     // "null" object
     objects.push_back({{-1,-1,-1}, {-1, -1, -1}});
-
-    // sort explosions so that popping returns earliest
-    std::sort(explosions.begin(), explosions.end(),
-        [](Explosion a, Explosion b) { return a.t0 > b.t0;});
 }
 
 void Scene::parseSimParams() {
@@ -108,16 +104,15 @@ void Scene::parseLight() {
 }
 
 void Scene::parseExplosion() {
-    Explosion ex;
     expect("{");
     while (true) {
         auto tok = getToken();
         if (tok == "pos") {
-            ex.pos = getFloat3();
+            explosion.pos = getFloat3();
         } else if (tok == "size") {
-            ex.size = getFloat();
+            explosion.size = getFloat();
         } else if (tok == "t0") {
-            ex.t0 = getFloat();
+            explosion.t0 = getFloat();
         } else if (tok == "}") {
             break;
         } else {
@@ -125,11 +120,6 @@ void Scene::parseExplosion() {
             exit(1);
         }
     }
-    // if (explosions.size()) {
-    //     std::cerr << "Error: only one explosion supported\n";
-    //     exit(1);
-    // }
-    explosions.push_back(ex);
 }
 
 void Scene::parseObject() {

@@ -43,12 +43,13 @@ struct Light {
 
 struct Explosion {
     Explosion() :
-        pos({0, 0, 0}),
-        size(1.0f),
-        t0(0.1f) {}
+        pos({32, 32, 32}),
+        size(6.0f),
+        t0(0.4f) {}
 
     cl_float3 pos;
     cl_float size, t0;
+    cl_float _1, _2;       // pad to 32 bytes
 } __attribute__ ((packed));
 
 // rectangular prisms only
@@ -64,7 +65,7 @@ public:
     SimParams params;
     Camera cam;
     Light light;
-    std::vector<Explosion> explosions;
+    Explosion explosion;
     std::vector<Object> objects;
 
 private:
