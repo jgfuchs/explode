@@ -23,7 +23,7 @@ __constant const float
     h           = 0.25,     // cell side length (m)
     hinv        = 1.0f/h,   // cells per unit length
     grav        = 9.8,      // acceleration due to gravity (m/s^2)
-    cVort       = 10.0,     // vorticity confinement
+    cVort       = 20.0,     // vorticity confinement
     // heat-related
     cBuoy       = 0.03*h,   // buoyancy multiplier
     cSink       = 0.3,      // smoke sinking
@@ -33,9 +33,10 @@ __constant const float
     // combustion-related
     tIgnite     = 500,      // (auto)ignition temperature (K)
     rBurn       = 3,        // fuel burn rate (amt/sec)
-    rHeat       = 1600,      // heat production rate (K/s/fuel)
-    rSmoke      = 1.0,        // smoke/soot production rate
-    rDvg        = 16;        // extra divergence = "explosiveness"
+    rHeat       = 1400,     // heat production rate (K/s/fuel)
+    rSmoke      = 1.0,      // smoke/soot production rate
+    rDvg        = 15,       // extra divergence = "explosiveness"
+    rSmokeDiss  = 0.005;    // smoke dissipation/dissappearance
 
 
 __constant int3 dx = {1, 0, 0},
@@ -207,6 +208,8 @@ void __kernel reaction(
         f.z -= df;
         dvg = rDvg * df;
     }
+
+    f.y *= 1.0f - rSmokeDiss;
 
     write_imagef(T_out, pos, f);
     write_imagef(Dvg, pos, (float4)(dvg, 0, 0, 0));

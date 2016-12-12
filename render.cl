@@ -21,7 +21,7 @@ void __kernel render(
 {
     int2 imgPos = {get_global_id(0), get_global_id(1)};
 
-    const int   nsamp = 256;            // main ray samples
+    const int   nsamp = 128;            // main ray samples
     const int   nlsamp = 64;            // light ray samples
     const float maxDist = sqrt(3.0f);   // cube diagonal
     const float ds = maxDist / nsamp;   // main ray step size
