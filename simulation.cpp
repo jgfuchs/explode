@@ -2,19 +2,22 @@
 
 #include "simulation.h"
 #include "clerror.h"
+#include "cie_xyz.h"
 
 Simulation::Simulation(Scene *sc, bool prof) :
     scene(sc), profiling(prof), dt(sc->params.dt), N(sc->params.grid_n), t(0.0)
 {
     try {
         initOpenCL();
-        initProfiling();
         initGrid();
         initRenderer();
+        queue.finish();
     } catch (cl::Error err) {
         std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
         exit(1);
     }
+
+    initProfiling();
 }
 
 void Simulation::advance() {
@@ -43,7 +46,8 @@ void Simulation::render(HostImage &img) {
     kRender.setArg(1, scene->light);
     kRender.setArg(2, T);
     kRender.setArg(3, B);
-    kRender.setArg(4, target);
+    kRender.setArg(4, bbspec);
+    kRender.setArg(5, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
     profile(RENDER);
@@ -85,8 +89,8 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
-    // kRender = cl::Kernel(program, "render_slice");
-    kRender = cl::Kernel(program, "render");
+    kRender = cl::Kernel(program, "render_slice");
+    // kRender = cl::Kernel(program, "render");
 
     // create buffers
     U = makeGrid3D(3);
@@ -106,13 +110,6 @@ void Simulation::initOpenCL() {
         scene->cam.size.x, scene->cam.size.y);
 }
 
-void Simulation::initProfiling() {
-    for (int i = 0; i < _LAST; i++) {
-        kernelTimes[i] = 0.0f;
-        kernelCalls[i] = 0;
-    }
-}
-
 void Simulation::initGrid() {
     cl_uint nobjs = scene->objects.size();
     auto objs = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -129,7 +126,24 @@ void Simulation::initGrid() {
 }
 
 void Simulation::initRenderer() {
+    auto cieVals = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+        sizeof(cie_coeffs), (void *)cie_coeffs);
 
+    const int nTemps = 256;
+    bbspec = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(cl_float3)*nTemps);
+
+    auto kBlackbody = cl::Kernel(program, "gen_blackbody");
+    kBlackbody.setArg(0, cieVals);
+    kBlackbody.setArg(1, bbspec);
+    queue.enqueueNDRangeKernel(kBlackbody, cl::NullRange, cl::NDRange(nTemps),
+            cl::NDRange(64), NULL, &event);
+}
+
+void Simulation::initProfiling() {
+    for (int i = 0; i < _LAST; i++) {
+        kernelTimes[i] = 0.0f;
+        kernelCalls[i] = 0;
+    }
 }
 
 void Simulation::advect() {

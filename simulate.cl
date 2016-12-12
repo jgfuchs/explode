@@ -33,7 +33,7 @@ __constant const float
     // combustion-related
     tIgnite     = 500,      // (auto)ignition temperature (K)
     rBurn       = 3,        // fuel burn rate (amt/sec)
-    rHeat       = 1400,     // heat production rate (K/s/fuel)
+    rHeat       = 2400,     // heat production rate (K/s/fuel)
     rSmoke      = 1.0,      // smoke/soot production rate
     rDvg        = 15,       // extra divergence = "explosiveness"
     rSmokeDiss  = 0.005;    // smoke dissipation/dissappearance
@@ -304,7 +304,7 @@ void __kernel add_explosion(
     float3 fpos = convert_float3(pos) / get_image_width(T);
     float d = distance(ex.pos, fpos);
     if (d < ex.size) {
-        f.xyz = (float3)(2000, 0, 1);
+        f.xyz = (float3)(3000, 0, 1);
     }
 
     write_imagef(T_out, pos, f);

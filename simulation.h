@@ -23,9 +23,9 @@ public:
 private:
     // initialization
     void initOpenCL();
-    void initProfiling();
     void initGrid();
     void initRenderer();
+    void initProfiling();
 
     // fluid dynamics
     void advect();
@@ -68,6 +68,7 @@ private:
                 Curl;           // curl (with magnitude as 4th component)
 
     cl::Image2D target;         // render target
+    cl::Buffer bbspec;          // blackbody RGB spectrum
 
     // profiling
     enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
