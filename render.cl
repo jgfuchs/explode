@@ -13,10 +13,10 @@ struct Light {
 #define TX_EPS      0.01f
 
 __constant const int
-    // nsamp = 256,        // main ray samples
-    // nlsamp = 96;        // light ray samples
-    nsamp = 128,        // main ray samples
-    nlsamp = 64;        // light ray samples
+    nsamp = 256,        // main ray samples
+    nlsamp = 96;        // light ray samples
+    // nsamp = 128,        // main ray samples
+    // nlsamp = 64;        // light ray samples
 __constant const float
     maxDist = 1.7320508,       // cube diagonal = sqrt(3)
     ds = maxDist / nsamp,       // main ray step size

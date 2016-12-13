@@ -248,7 +248,7 @@ void Simulation::setBounds() {
 }
 
 void Simulation::addExplosion() {
-    const float spread = 0.0;
+    const float spread = 3.5;
 
     auto kAddExplosion = cl::Kernel(program, "add_explosion");
     Explosion ex = scene->explosion;

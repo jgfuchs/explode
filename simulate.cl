@@ -30,7 +30,7 @@ __constant const float
     h           = 0.25,     // cell side length (m)
     hinv        = 1.0f/h,   // cells per unit length
     grav        = 9.8,      // acceleration due to gravity (m/s^2)
-    cVort       = 20.0,     // vorticity confinement
+    cVort       = 8.0,     // vorticity confinement
     // heat-related
     cBuoy       = 0.04*h,   // buoyancy multiplier
     cSink       = 0.3,      // smoke sinking
@@ -42,8 +42,8 @@ __constant const float
     rBurn       = 4,        // fuel burn rate (amt/sec)
     rHeat       = 2400,     // heat production rate (K/s/fuel)
     rSmoke      = 1.0,      // smoke/soot production rate
-    rDvg        = 20,       // extra divergence = "explosiveness"
-    rSmokeDiss  = 0.005;    // smoke dissipation/dissappearance
+    rDvg        = 18,       // extra divergence = "explosiveness"
+    rSmokeDiss  = 0.008;    // smoke dissipation/dissappearance
 
 
 __constant int3 dx = {1, 0, 0},
