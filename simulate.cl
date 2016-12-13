@@ -17,6 +17,13 @@ __constant sampler_t samp_n =
     CLK_ADDRESS_CLAMP |
     CLK_FILTER_LINEAR;
 
+// for reading normalized float coords, no interpolation
+__constant sampler_t samp_ni =
+    CLK_NORMALIZED_COORDS_TRUE |
+    CLK_ADDRESS_CLAMP |
+    CLK_FILTER_NEAREST;
+
+
 // convention: c* = coefficient, t* = temperature, r* = rate
 __constant const float
     // general constants
@@ -27,7 +34,7 @@ __constant const float
     // heat-related
     cBuoy       = 0.03*h,   // buoyancy multiplier
     cSink       = 0.3,      // smoke sinking
-    cCooling    = 1400,     // cooling
+    cCooling    = 1200,     // cooling
     tAmb        = 300,      // ambient temperature (K)
     tMax        = 6000,     // "maximum" temperature (K)
     // combustion-related

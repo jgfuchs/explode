@@ -17,6 +17,8 @@ inline float4 getBlackbody(image2d_t Spec, float temp) {
     return 0;
 }
 
+
+
 void __kernel render(
     const struct Camera cam,
     const struct Light light,
@@ -41,7 +43,26 @@ void __kernel render(
     float3 Lo = 0.0;     // total light output from ray
 
     int i, j;
+    float3 bg = {0.5, 0.5, 0.9};
     for (i = 0; i < nsamp; i++) {
+        if (read_imageui(B, samp_ni, pos).x > 0.5f) {
+            float3 ldir = normalize(light.pos - pos) * dsl;
+            float3 lpos = pos + ldir;
+            float txl = 1.0f;
+
+            for (j = 0; j < nlsamp; j++) {
+                float rhol = read_imagef(T, samp_n, lpos).y;
+                txl *= 1.0f - rhol * dsl * absorption;
+                if (txl < TX_EPS) break;
+
+                lpos += ldir;
+            }
+
+            // float Li = light.intensity * txl;
+            bg = (float3)(.22, .29, .33) * txl;
+            break;
+        }
+
         float4 Tsamp = read_imagef(T, samp_n, pos);
         float rho = Tsamp.y;
         if (rho > RHO_EPS) {
@@ -80,7 +101,6 @@ void __kernel render(
         }
     }
 
-    float3 bg = {0.5, 0.5, 0.9};
     float3 color = Lo + tx * bg;
 
     uint4 rgba = {convert_uint3(color*255), 255};

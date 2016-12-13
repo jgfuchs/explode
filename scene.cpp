@@ -138,6 +138,12 @@ void Scene::parseObject() {
             exit(1);
         }
     }
+
+    // convert centered pos to lower-left pos
+    obj.pos.x -= 0.5 * obj.dim.x;
+    obj.pos.y -= 0.5 * obj.dim.y;
+    obj.pos.z -= 0.5 * obj.dim.z;
+
     objects.push_back(obj);
 }
 
