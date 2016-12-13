@@ -17,8 +17,8 @@ Light {
 }
 
 Explosion {
-    pos .5 .08 .5
-    size 0.01
+    pos .5 .12 .4
+    size 0.015
     subex 2
 }
 

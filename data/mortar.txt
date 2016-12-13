@@ -1,0 +1,53 @@
+SimParam {
+    grid 128
+    dt 0.04
+    nsteps 125
+    niters 30
+    walls 1
+}
+
+Camera {
+    pos 0.5 0.5 -2
+    size 400 400
+}
+
+Light {
+    pos 2 0.5 -1
+    intensity 3
+}
+
+Explosion {
+    pos .39 .16 .5
+    size 0.06
+    subex 1
+}
+
+# bottom
+Object {
+    pos 50 4 64
+    dim 16 4 16
+}
+
+# left side
+Object {
+    pos 40 26 64
+    dim 4 46 20
+}
+
+# right side
+Object {
+    pos 60 26 64
+    dim 4 46 20
+}
+
+# back side
+Object {
+    pos 50 26 74
+    dim 20 46 4
+}
+
+# front side
+Object {
+    pos 50 26 54
+    dim 22 46 4
+}

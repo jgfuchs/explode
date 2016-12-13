@@ -1,5 +1,5 @@
 SimParam {
-    grid 128
+    grid 64
     dt 0.04
     nsteps 100
     niters 40
@@ -17,9 +17,9 @@ Light {
 }
 
 Explosion {
-    pos .5 .08 .5
-    size 0.04
-    subex 3
+    pos .5 .07 .5
+    size 0.05
+    subex 2
 }
 
 Object {

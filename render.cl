@@ -13,10 +13,10 @@ struct Light {
 #define TX_EPS      0.01f
 
 __constant const int
-    nsamp = 256,        // main ray samples
-    nlsamp = 96;        // light ray samples
-    // nsamp = 128,        // main ray samples
-    // nlsamp = 64;        // light ray samples
+    // nsamp = 256,        // main ray samples
+    // nlsamp = 96;        // light ray samples
+    nsamp = 128,        // main ray samples
+    nlsamp = 64;        // light ray samples
 __constant const float
     maxDist = 1.7320508,       // cube diagonal = sqrt(3)
     ds = maxDist / nsamp,       // main ray step size
@@ -123,7 +123,7 @@ void __kernel render_slice(
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
     float2 fpos = convert_float2(pos) * get_image_width(T) / cam.size.x;
-    float4 sp = (float4)(fpos, 32, 0);
+    float4 sp = (float4)(fpos, 64, 0);
     uint b = read_imageui(B, samp_f, sp).x;
     uint4 color = {0, 0, 0, 255};
 
@@ -139,12 +139,12 @@ void __kernel render_slice(
     // color.y = (int) 255 * samp.z;
 
     // black body
-    // float4 bb = getBlackbody(Spec, samp.x);
-    // color.xyz = convert_uint3(255 * bb.xyz * bb.w * 0.1f);
+    float4 bb = getBlackbody(Spec, samp.x);
+    color.xyz = convert_uint3(255 * bb.xyz * bb.w * 0.1f);
 
     // mark walls
     if (b > 0) {
-        color.xyz = (uint3)(255, 128, 0);
+        color.xyz = (uint3)(128);
     }
 
     write_imageui(img, (int2)(pos.x, cam.size.y-1-pos.y), color);
