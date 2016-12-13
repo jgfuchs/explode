@@ -89,8 +89,8 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
-    kRender = cl::Kernel(program, "render_slice");
-    // kRender = cl::Kernel(program, "render");
+    // kRender = cl::Kernel(program, "render_slice");
+    kRender = cl::Kernel(program, "render");
 
     // create buffers
     U = makeGrid3D(3);
@@ -129,8 +129,8 @@ void Simulation::initRenderer() {
     auto cieVals = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
         sizeof(cie_coeffs), (void *)cie_coeffs);
 
-    const int nTemps = 256;
-    bbspec = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(cl_float3)*nTemps);
+    const int nTemps = 512;
+    bbspec = cl::Image2D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), nTemps, 1);
 
     auto kBlackbody = cl::Kernel(program, "gen_blackbody");
     kBlackbody.setArg(0, cieVals);

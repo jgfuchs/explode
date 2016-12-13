@@ -12,12 +12,17 @@ struct Light {
 #define RHO_EPS     0.001f
 #define TX_EPS      0.01f
 
+inline float4 getBlackbody(image2d_t Spec, float temp) {
+    return read_imagef(Spec, samp_n, (float2)(temp / tMax, 0));
+    return 0;
+}
+
 void __kernel render(
     const struct Camera cam,
     const struct Light light,
     __read_only image3d_t T,
     __read_only image3d_t B,
-    __global float3 *Spec,
+    __read_only image2d_t Spec,
     __write_only image2d_t img)
 {
     int2 imgPos = {get_global_id(0), get_global_id(1)};
@@ -38,7 +43,6 @@ void __kernel render(
     int i, j;
     for (i = 0; i < nsamp; i++) {
         float4 Tsamp = read_imagef(T, samp_n, pos);
-        float temp = Tsamp.x;
         float rho = Tsamp.y;
         if (rho > RHO_EPS) {
             tx *= 1.0f - rho * ds * absorption;
@@ -56,8 +60,13 @@ void __kernel render(
                 lpos += ldir;
             }
 
+            // incident light from light source (attenuated)
             float Li = light.intensity * txl;
-            float3 Le = Spec[(int)(temp / tMax * 256.0f)]*8.0f;
+
+            // blackbody radiation emitted
+            float4 bb = getBlackbody(Spec, Tsamp.x);
+            float3 Le = bb.xyz * bb.w * 0.5f;
+
             Lo += (Li + Le) * tx * rho * ds;
         }
 
@@ -73,7 +82,6 @@ void __kernel render(
 
     float3 bg = {0.5, 0.5, 0.9};
     float3 color = Lo + tx * bg;
-    // color /= max(max(1.0f, color.x), max(color.y, color.z));
 
     uint4 rgba = {convert_uint3(color*255), 255};
     write_imageui(img, (int2)(imgPos.x, cam.size.y-1-imgPos.y), rgba);
@@ -85,7 +93,7 @@ void __kernel render_slice(
     const struct Light light,
     __read_only image3d_t T,
     __read_only image3d_t B,
-    __global float3 *Spec,
+    __read_only image2d_t Spec,
     __write_only image2d_t img)
 {
     int2 pos = {get_global_id(0), get_global_id(1)};
@@ -106,7 +114,8 @@ void __kernel render_slice(
     // color.y = (int) 255 * samp.z;
 
     // black body
-    color.xyz = convert_uint3(255 * Spec[(int)(samp.x / tMax * 256.0f)]);
+    float4 bb = getBlackbody(Spec, samp.x);
+    color.xyz = convert_uint3(255 * bb.xyz * bb.w * 0.1f);
 
     // mark walls
     if (b > 0) {
@@ -124,31 +133,32 @@ float planck(float wl, float t) {
     const float C2 = 1.4388e-2;     // h*c/k
 
     wl *= 1e-9;
-    return C1 * pown(wl, -5) / (exp(C2 / (wl * t)) - 1.0f);
+    return C1 * pown(wl, -5) / (exp(C2 / (wl * t)) - 1.0f) * 1e-9;
 }
 
 void __kernel gen_blackbody(
     __global float3 *CIE,
-    __global float3 *S)
+    __write_only image2d_t Spec)
 {
     int pos = get_global_id(0);
-    float temp = tMax * pos / get_global_size(0);
-    if (temp < 1000.0f) {
-        S[pos] = (float3)(0);
+    float temp = tMax * (float)(pos) / get_global_size(0);
+
+    // avoid NaNs
+    if (temp < 500.0f) {
+        write_imagef(Spec, (int2)(pos, 0), 0);
         return;
     }
 
     const int wl_min = 380;
     const int wl_max = 780;
 
-    // integrate blackbody spectrum against CIE color matching
+    // integrate blackbody spectrum against CIE color matching function
     float3 xyz = 0;
     float wl = wl_min;
     for (int i = 0; i < 81; i++) {
         xyz += CIE[i] * planck((float) wl, temp);
         wl += 5.0f;
     }
-    xyz = xyz / (xyz.x + xyz.y + xyz.z);
 
     // XYZ to sRGB conversion matrix
     const float3 sRGB[3] = {
@@ -156,14 +166,13 @@ void __kernel gen_blackbody(
         {-0.9692660,  1.8760108,  0.0415560},
         { 0.0556434, -0.2040259,  1.0572252}
     };
-
     float3 rgb = {dot(sRGB[0], xyz), dot(sRGB[1], xyz), dot(sRGB[2], xyz)};
+
+    // ensure all components >= 0
     rgb += -min(min(0.0f, rgb.x), min(rgb.y, rgb.z));
+    // make brightest component = 1
     float rgbMax = max(max(rgb.x, rgb.y), rgb.z);
     if (rgbMax > 0.0f) rgb /= rgbMax;
 
-    S[pos] = rgb;
-
-    // printf("%.0f %f %f %f\n", temp, xyz.x, xyz.y, xyz.z);
-    // printf("%.0f %f %f %f\n", temp, rgb.x, rgb.y, rgb.z);
+    write_imagef(Spec, (int2)(pos, 0), (float4)(rgb, sqrt(length(xyz))));
 }

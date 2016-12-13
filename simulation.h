@@ -68,7 +68,7 @@ private:
                 Curl;           // curl (with magnitude as 4th component)
 
     cl::Image2D target;         // render target
-    cl::Buffer bbspec;          // blackbody RGB spectrum
+    cl::Image2D bbspec;         // blackbody RGB spectrum
 
     // profiling
     enum {ADVECT, CURL, ADD_FORCES, REACTION, DIVERGENCE, JACOBI, PROJECT,
