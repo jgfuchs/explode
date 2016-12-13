@@ -45,11 +45,11 @@ struct Explosion {
     Explosion() :
         pos({.5, .2, .5}),
         size(0.05),
-        t0(0.2f) {}
+        subex(2) {}
 
     cl_float3 pos;
-    cl_float size, t0;
-    cl_float _1, _2;       // pad to 32 bytes
+    cl_float size;
+    unsigned subex;
 } __attribute__ ((packed));
 
 // rectangular prisms only

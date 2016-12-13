@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 
 #include "simulation.h"
 #include "clerror.h"
@@ -21,7 +22,11 @@ Simulation::Simulation(Scene *sc, bool prof) :
 }
 
 void Simulation::advance() {
-    addExplosion();
+    static bool exploded = false;
+    if (t > 0.2 && !exploded) {
+        addExplosion();
+        exploded = true;
+    }
 
     setBounds();
     addForces();
@@ -243,16 +248,24 @@ void Simulation::setBounds() {
 }
 
 void Simulation::addExplosion() {
-    static bool done = false;
-    if (done || t < scene->explosion.t0) return;
-    else done = true;
-
     auto kAddExplosion = cl::Kernel(program, "add_explosion");
-    kAddExplosion.setArg(0, scene->explosion);
-    kAddExplosion.setArg(1, T);
-    kAddExplosion.setArg(2, T_tmp);
-    enqueueGrid(kAddExplosion);
-    std::swap(T, T_tmp);
+    Explosion ex = scene->explosion;
+
+    for (unsigned i = 0; i < ex.subex; i++) {
+        cl_float3 pos = {
+            ex.pos.x + randf()*ex.size,
+            ex.pos.y + randf()*ex.size,
+            ex.pos.z + randf()*ex.size,
+        };
+        cl_float size = ex.size / std::pow(ex.subex, 1.0/3.0f);
+
+        kAddExplosion.setArg(0, pos);
+        kAddExplosion.setArg(1, size);
+        kAddExplosion.setArg(2, T);
+        kAddExplosion.setArg(3, T_tmp);
+        enqueueGrid(kAddExplosion);
+        std::swap(T, T_tmp);
+    }
 }
 
 cl::Image3D Simulation::makeGrid3D(int ncomp, int dtype) {

@@ -54,11 +54,6 @@ struct Object {
     float3 pos, dim;
 };
 
-struct Explosion {
-    float3 pos;
-    float size;
-};
-
 
 // lookup value at coordinate (i, j, k) in image
 inline float4 ix(image3d_t img, int3 c) {
@@ -297,10 +292,10 @@ void __kernel set_bounds(
     write_imagef(T_out, pos, t);
 }
 
-#include "noise.cl"
 
 void __kernel add_explosion(
-    const struct Explosion ex,
+    const float3 loc,
+    const float size,
     __read_only image3d_t T,
     __write_only image3d_t T_out)
 {
@@ -310,9 +305,9 @@ void __kernel add_explosion(
 
     // explosion positions are normalized coords
     float3 fpos = convert_float3(pos) / get_image_width(T);
-    float d = distance(ex.pos, fpos) + 0.1f*noise3f(fpos*0.5f);
-    if (d < ex.size) {
-        f.xyz = (float3)(3000, 0, 1 + 0.8*noise3f(fpos*0.5f));
+    float d = distance(loc, fpos);
+    if (d < size) {
+        f.xyz = (float3)(3000, 0, 1);
     }
 
     write_imagef(T_out, pos, f);

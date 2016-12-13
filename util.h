@@ -42,5 +42,6 @@ inline double time_since(TimePoint &then) {
     return dur.count();
 }
 
+float randf();
 
 #endif // __UTIL_H__

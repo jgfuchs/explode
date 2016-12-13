@@ -111,8 +111,8 @@ void Scene::parseExplosion() {
             explosion.pos = getFloat3();
         } else if (tok == "size") {
             explosion.size = getFloat();
-        } else if (tok == "t0") {
-            explosion.t0 = getFloat();
+        } else if (tok == "subex") {
+            explosion.subex = getInt();
         } else if (tok == "}") {
             break;
         } else {
