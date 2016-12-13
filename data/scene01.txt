@@ -1,9 +1,9 @@
 SimParam {
     grid 64
     dt 0.04
-    nsteps 50
-    niters 20
-    walls 0
+    nsteps 150
+    niters 40
+    walls 1
 }
 
 Camera {
@@ -12,8 +12,8 @@ Camera {
 }
 
 Light {
-    pos 1.0 0.5 -1.0
-    intensity 1
+    pos 2.0 2.0 -1.0
+    intensity 3
 }
 
 Explosion {

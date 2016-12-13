@@ -66,7 +66,7 @@ void __kernel render(
     int i, j;
     float3 bg = {0.5, 0.5, 0.9};
     for (i = 0; i < nsamp; i++) {
-        if (read_imageui(B, samp_ni, pos).x > 0.5f) {
+        if (read_imageui(B, samp_ni, pos).x == 1) {
             float3 Li = trace_to_light(T, Spec, &light, pos);
 
             float3 L = normalize(light.pos - pos);
@@ -87,7 +87,7 @@ void __kernel render(
 
             // blackbody radiation
             float4 bb = getBlackbody(Spec, Tsamp.x);
-            float3 Le = bb.xyz * bb.w * 0.5f;
+            float3 Le = bb.xyz * bb.w * 0.7f;
 
             Lo += (Li + Le * tx) * rho * ds;
         }
