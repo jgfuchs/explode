@@ -19,7 +19,7 @@ Light {
 Explosion {
     pos .5 .17 .5
     size 0.05
-    subex 4
+    subex 5
 }
 
 Object {

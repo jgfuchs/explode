@@ -248,16 +248,20 @@ void Simulation::setBounds() {
 }
 
 void Simulation::addExplosion() {
+    const float spread = 1.5;
+
     auto kAddExplosion = cl::Kernel(program, "add_explosion");
     Explosion ex = scene->explosion;
-
+    float volDiv = std::pow(ex.subex, 1.0/3.0f);
     for (unsigned i = 0; i < ex.subex; i++) {
         cl_float3 pos = {
-            ex.pos.x + randf()*ex.size,
-            ex.pos.y + randf()*ex.size,
-            ex.pos.z + randf()*ex.size,
+            ex.pos.x + randf() * ex.size * spread,
+            ex.pos.y + randf() * ex.size * spread,
+            ex.pos.z + randf() * ex.size * spread,
         };
-        cl_float size = ex.size / std::pow(ex.subex, 1.0/3.0f);
+
+        // TODO: conserve total explosion volume
+        cl_float size = (ex.size + 0.5 * ex.size * randf()) / volDiv;
 
         kAddExplosion.setArg(0, pos);
         kAddExplosion.setArg(1, size);
