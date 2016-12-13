@@ -11,9 +11,9 @@ struct SimParams {
     SimParams() :
         grid_n(128),
         nsteps(100),
-        niters(20),
-        dt(0.02),
-        walls(false) {}
+        niters(30),
+        dt(0.04),
+        walls(true) {}
 
     int grid_n;
     int nsteps, niters;
@@ -33,8 +33,8 @@ struct Camera {
 
 struct Light {
     Light() :
-        pos({1.0, 1.0, 0}),
-        intensity(10) {}
+        pos({1.0, 1.0, -1.0}),
+        intensity(3) {}
 
     cl_float3 pos;
     cl_float intensity;
@@ -43,9 +43,9 @@ struct Light {
 
 struct Explosion {
     Explosion() :
-        pos({32, 32, 32}),
-        size(6.0f),
-        t0(0.4f) {}
+        pos({.5, .2, .5}),
+        size(0.05),
+        t0(0.2f) {}
 
     cl_float3 pos;
     cl_float size, t0;
