@@ -298,20 +298,49 @@ void __kernel set_bounds(
 }
 
 
+int LFSR_Rand_Gen(int n) {
+  n = (n << 13) ^ n;
+  return (n * (n*n*15731+789221) + 1376312589) & 0x7fffffff;
+}
+
+float LFSR_Rand_Gen_f( int n ) {
+  return (float)(LFSR_Rand_Gen(n));
+}
+
+float noise3f(float3 p) {
+    float3 _f;
+    int3 ip = convert_int3(floor(p));
+    float3 u = fract(p, &_f);
+    u = u*u*(3.0f-2.0f*u);
+
+    int n = ip.x + ip.y*57 + ip.z*113;
+
+    float res = mix(mix(mix(LFSR_Rand_Gen_f(n+(0+57*0+113*0)),
+                          LFSR_Rand_Gen_f(n+(1+57*0+113*0)),u.x),
+                      mix(LFSR_Rand_Gen_f(n+(0+57*1+113*0)),
+                          LFSR_Rand_Gen_f(n+(1+57*1+113*0)),u.x),u.y),
+                 mix(mix(LFSR_Rand_Gen_f(n+(0+57*0+113*1)),
+                          LFSR_Rand_Gen_f(n+(1+57*0+113*1)),u.x),
+                      mix(LFSR_Rand_Gen_f(n+(0+57*1+113*1)),
+                          LFSR_Rand_Gen_f(n+(1+57*1+113*1)),u.x),u.y),u.z);
+
+  return 1.0f - res*(1.0f / 1073741824.0f);
+}
+
 void __kernel add_explosion(
     const struct Explosion ex,
     __read_only image3d_t T,
     __write_only image3d_t T_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-
+    int id = (get_image_depth(T) * pos.z + pos.y) * get_image_height(T) + pos.x;
     float4 f = read_imagef(T, pos);
 
     // explosion positions are normalized coords
     float3 fpos = convert_float3(pos) / get_image_width(T);
-    float d = distance(ex.pos, fpos);
+    float d = distance(ex.pos, fpos) + 0.1f*noise3f(fpos*0.5f);
     if (d < ex.size) {
-        f.xyz = (float3)(3000, 0, 1);
+        f.xyz = (float3)(3000, 0, 1 + 0.8*noise3f(fpos*0.5f));
     }
 
     write_imagef(T_out, pos, f);

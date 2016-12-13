@@ -136,8 +136,11 @@ void __kernel render_slice(
     // color.y = (int) 255 * samp.z;
 
     // black body
-    float4 bb = getBlackbody(Spec, samp.x);
-    color.xyz = convert_uint3(255 * bb.xyz * bb.w * 0.1f);
+    // float4 bb = getBlackbody(Spec, samp.x);
+    // color.xyz = convert_uint3(255 * bb.xyz * bb.w * 0.1f);
+
+    float r = noise3f((float3)(fpos*.25f, 1)) * 0.5f + 0.5f;
+    color.xyz = convert_uint3((float3)(r)*255);
 
     // mark walls
     if (b > 0) {
