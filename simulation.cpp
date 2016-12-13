@@ -10,8 +10,8 @@ Simulation::Simulation(Scene *sc, bool prof) :
     try {
         initOpenCL();
         initGrid();
-        initRenderer();
         queue.finish();
+        initRenderer();
     } catch (cl::Error err) {
         std::cerr << "OpenCL error: "  << err.what() << ": " << getCLError(err.err()) << "\n";
         exit(1);
@@ -46,8 +46,9 @@ void Simulation::render(HostImage &img) {
     kRender.setArg(1, scene->light);
     kRender.setArg(2, T);
     kRender.setArg(3, B);
-    kRender.setArg(4, bbspec);
-    kRender.setArg(5, target);
+    kRender.setArg(4, BN);
+    kRender.setArg(5, bbspec);
+    kRender.setArg(6, target);
     queue.enqueueNDRangeKernel(kRender, cl::NullRange, cl::NDRange(w, h),
             cl::NDRange(16, 16), NULL, &event);
     profile(RENDER);
@@ -98,6 +99,7 @@ void Simulation::initOpenCL() {
     T = makeGrid3D(3);
     T_tmp = makeGrid3D(3);
     B = makeGrid3D(1, CL_UNSIGNED_INT8);
+    BN = makeGrid3D(3);
 
     P = makeGrid3D(1);
     P_tmp = makeGrid3D(1);
@@ -126,17 +128,27 @@ void Simulation::initGrid() {
 }
 
 void Simulation::initRenderer() {
+    // pre-compute blackbody spectra
+
     auto cieVals = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
         sizeof(cie_coeffs), (void *)cie_coeffs);
 
     const int nTemps = 512;
-    bbspec = cl::Image2D(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), nTemps, 1);
+    bbspec = cl::Image2D(context, CL_MEM_READ_WRITE,
+        cl::ImageFormat(CL_RGBA, CL_FLOAT), nTemps, 1);
 
     auto kBlackbody = cl::Kernel(program, "gen_blackbody");
     kBlackbody.setArg(0, cieVals);
     kBlackbody.setArg(1, bbspec);
     queue.enqueueNDRangeKernel(kBlackbody, cl::NullRange, cl::NDRange(nTemps),
             cl::NDRange(64), NULL, &event);
+
+    // pre-compute object normals
+
+    auto kNormals = cl::Kernel(program, "gen_normals");
+    kNormals.setArg(0, B);
+    kNormals.setArg(1, BN);
+    enqueueGrid(kNormals);
 }
 
 void Simulation::initProfiling() {
@@ -273,7 +285,6 @@ void Simulation::enqueueGrid(cl::Kernel kernel) {
 void Simulation::profile(int pk) {
     if (profiling) {
         event.wait();
-
         cl_ulong t2 = event.getProfilingInfo<CL_PROFILING_COMMAND_START>();
         cl_ulong t3 = event.getProfilingInfo<CL_PROFILING_COMMAND_END>();
         kernelTimes[pk] += (t3 - t2) * 1e-9;

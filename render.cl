@@ -12,29 +12,51 @@ struct Light {
 #define RHO_EPS     0.001f
 #define TX_EPS      0.01f
 
+__constant const int
+    nsamp = 128,        // main ray samples
+    nlsamp = 64;        // light ray samples
+__constant const float
+    maxDist = 1.73205080,       // cube diagonal = sqrt(3)
+    ds = maxDist / nsamp,       // main ray step size
+    dsl = maxDist / nlsamp,     // light ray step size
+    absorption = 30.0;
+
 inline float4 getBlackbody(image2d_t Spec, float temp) {
     return read_imagef(Spec, samp_n, (float2)(temp / tMax, 0));
-    return 0;
 }
 
+float trace_to_light(
+    image3d_t T,
+    image3d_t B,
+    image2d_t Spec,
+    const struct Light *light,
+    float3 pos0)
+{
+    float3 dir = normalize(light->pos - pos0) * dsl;
+    float3 pos = pos0 + dir;
+    float tx = 1.0f;
 
+    for (int i = 0; i < nlsamp; i++) {
+        float rho = read_imagef(T, samp_n, pos).y;
+        tx *= 1.0f - rho * dsl * absorption;
+        if (tx < TX_EPS) break;
+
+        pos += dir;
+    }
+
+    return tx;
+}
 
 void __kernel render(
     const struct Camera cam,
     const struct Light light,
     __read_only image3d_t T,
     __read_only image3d_t B,
+    __read_only image3d_t BN,
     __read_only image2d_t Spec,
     __write_only image2d_t img)
 {
     int2 imgPos = {get_global_id(0), get_global_id(1)};
-
-    const int   nsamp = 128;            // main ray samples
-    const int   nlsamp = 64;            // light ray samples
-    const float maxDist = sqrt(3.0f);   // cube diagonal
-    const float ds = maxDist / nsamp;   // main ray step size
-    const float dsl = maxDist / nlsamp; // light ray step size
-    const float absorption = 30.0;
 
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
     float3 dir = normalize(pos - cam.pos) * ds;
@@ -46,20 +68,13 @@ void __kernel render(
     float3 bg = {0.5, 0.5, 0.9};
     for (i = 0; i < nsamp; i++) {
         if (read_imageui(B, samp_ni, pos).x > 0.5f) {
-            float3 ldir = normalize(light.pos - pos) * dsl;
-            float3 lpos = pos + ldir;
-            float txl = 1.0f;
+            float txl = trace_to_light(T, B, Spec, &light, pos);
+            float Li = light.intensity * txl;
 
-            for (j = 0; j < nlsamp; j++) {
-                float rhol = read_imagef(T, samp_n, lpos).y;
-                txl *= 1.0f - rhol * dsl * absorption;
-                if (txl < TX_EPS) break;
-
-                lpos += ldir;
-            }
-
-            // float Li = light.intensity * txl;
-            bg = (float3)(.22, .29, .33) * txl;
+            float3 L = normalize(light.pos - pos);
+            float3 N = read_imagef(BN, samp_n, pos).xyz;
+            float3 C = (float3)(.28, .36, .41);
+            bg = dot(L, N) * C * (txl * 1.5f);
             break;
         }
 
@@ -69,20 +84,8 @@ void __kernel render(
             tx *= 1.0f - rho * ds * absorption;
             if (tx < TX_EPS) break;
 
-            float3 ldir = normalize(light.pos - pos) * dsl;
-            float3 lpos = pos + ldir;
-            float txl = 1.0f;
-
-            for (j = 0; j < nlsamp; j++) {
-                float rhol = read_imagef(T, samp_n, lpos).y;
-                txl *= 1.0f - rhol * dsl * absorption;
-                if (txl < TX_EPS) break;
-
-                lpos += ldir;
-            }
-
             // incident light from light source (attenuated)
-            float Li = light.intensity * txl;
+            float Li = trace_to_light(T, B, Spec, &light, pos);
 
             // blackbody radiation emitted
             float4 bb = getBlackbody(Spec, Tsamp.x);
@@ -113,6 +116,7 @@ void __kernel render_slice(
     const struct Light light,
     __read_only image3d_t T,
     __read_only image3d_t B,
+    __read_only image3d_t BN,
     __read_only image2d_t Spec,
     __write_only image2d_t img)
 {
@@ -195,4 +199,35 @@ void __kernel gen_blackbody(
     if (rgbMax > 0.0f) rgb /= rgbMax;
 
     write_imagef(Spec, (int2)(pos, 0), (float4)(rgb, sqrt(length(xyz))));
+}
+
+
+inline uint4 ixu(image3d_t img, int3 c) {
+    return read_imageui(img, samp_i, c);
+}
+
+void __kernel gen_normals(
+    __read_only image3d_t B,
+    __write_only image3d_t BN)
+{
+    int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
+    if (ixu(B, pos).x != 1) {
+        write_imagef(BN, pos, (float4)(1));
+        return;
+    }
+
+
+    float3 fdx = convert_float3(dx),
+           fdy = convert_float3(dy),
+           fdz = convert_float3(dz);
+
+    float3 n = 0;
+    n += ixu(B, pos+dx).x == 0 ?  fdx : 0;
+    n += ixu(B, pos-dx).x == 0 ? -fdx : 0;
+    n += ixu(B, pos+dy).x == 0 ?  fdy : 0;
+    n += ixu(B, pos-dy).x == 0 ? -fdy : 0;
+    n += ixu(B, pos+dz).x == 0 ?  fdz : 0;
+    n += ixu(B, pos-dz).x == 0 ? -fdz : 0;
+    n = normalize(n);
+    write_imagef(BN, pos, (float4)(n, 0));
 }

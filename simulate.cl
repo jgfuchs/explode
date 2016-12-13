@@ -59,6 +59,7 @@ struct Explosion {
     float size;
 };
 
+
 // lookup value at coordinate (i, j, k) in image
 inline float4 ix(image3d_t img, int3 c) {
     return read_imagef(img, samp_i, c);
@@ -209,7 +210,6 @@ void __kernel reaction(
     float dvg = 0;
     if (f.x > tIgnite && f.z > 0.0f) {
         float df = min(f.z, rBurn * dt);
-
         f.x += rHeat * df;
         f.y += rSmoke * df;
         f.z -= df;

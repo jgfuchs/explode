@@ -60,7 +60,7 @@ private:
     // state variables
     cl::Image3D U, U_tmp,       // velocity vector field
                 T, T_tmp,       // (temperature, smoke/soot, fuel)
-                B;              // boundaries
+                B, BN;          // boundaries, boundary normals
 
     // intermediates
     cl::Image3D Dvg, Dvg_tmp,   // divergence

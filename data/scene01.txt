@@ -24,12 +24,17 @@ Explosion {
 
 Object {
    pos 64 0 64
-   dim 128 1 128
+   dim 128 2 128
 }
 
 Object {
-   pos 32 32 63
-   dim 64 64 1
+   pos 32 32 62
+   dim 64 64 2
+}
+
+Object {
+    pos 32 32 32
+    dim 12 12 12
 }
 
 #
