@@ -69,6 +69,7 @@ void __kernel render(
         if (read_imageui(B, samp_ni, pos).x == 1) {
             float3 Li = trace_to_light(T, Spec, &light, pos);
 
+            // diffuse reflection
             float3 L = normalize(light.pos - pos);
             float3 N = read_imagef(BN, samp_n, pos).xyz;
             float3 C = (float3)(.28, .36, .41);
@@ -138,9 +139,6 @@ void __kernel render_slice(
     // black body
     // float4 bb = getBlackbody(Spec, samp.x);
     // color.xyz = convert_uint3(255 * bb.xyz * bb.w * 0.1f);
-
-    float r = noise3f((float3)(fpos*.25f, 1)) * 0.5f + 0.5f;
-    color.xyz = convert_uint3((float3)(r)*255);
 
     // mark walls
     if (b > 0) {
@@ -217,7 +215,6 @@ void __kernel gen_normals(
         return;
     }
 
-
     float3 fdx = convert_float3(dx),
            fdy = convert_float3(dy),
            fdz = convert_float3(dz);
@@ -230,5 +227,6 @@ void __kernel gen_normals(
     n += ixu(B, pos+dz).x == 0 ?  fdz : 0;
     n += ixu(B, pos-dz).x == 0 ? -fdz : 0;
     n = normalize(n);
+
     write_imagef(BN, pos, (float4)(n, 0));
 }
