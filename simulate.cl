@@ -42,8 +42,8 @@ __constant const float
     rBurn       = 3,        // fuel burn rate (amt/sec)
     rHeat       = 2400,     // heat production rate (K/s/fuel)
     rSmoke      = 1.0,      // smoke/soot production rate
-    rDvg        = 20,       // extra divergence = "explosiveness"
-    rSmokeDiss  = 0.007;    // smoke dissipation/dissappearance
+    rDvg        = 22,       // extra divergence = "explosiveness"
+    rSmokeDiss  = 0.005;    // smoke dissipation/dissappearance
 
 
 __constant int3 dx = {1, 0, 0},

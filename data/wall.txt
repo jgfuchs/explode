@@ -17,12 +17,12 @@ Light {
 }
 
 Explosion {
-    pos .5 .14 .5
+    pos .4 .3 .5
     size 0.05
-    subex 6
+    subex 1
 }
 
 Object {
-   pos 64 0 64
-   dim 128 2 128
+   pos 40 40 64
+   dim 4 80 128
 }

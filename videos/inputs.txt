@@ -1,1 +1,8 @@
 file simple.mp4
+file multi1.mp4
+file multi2.mp4
+file small1.mp4
+file small2.mp4
+file wall.mp4
+file floor.mp4
+file cap.mp4

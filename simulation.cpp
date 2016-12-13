@@ -248,7 +248,7 @@ void Simulation::setBounds() {
 }
 
 void Simulation::addExplosion() {
-    const float spread = 1.2;
+    const float spread = 1.4;
 
     auto kAddExplosion = cl::Kernel(program, "add_explosion");
     Explosion ex = scene->explosion;
@@ -261,7 +261,7 @@ void Simulation::addExplosion() {
         };
 
         // TODO: conserve total explosion volume
-        cl_float size = (ex.size + 0.5 * ex.size * randf()) / volDiv;
+        cl_float size = (ex.size + 0.4 * ex.size * randf()) / volDiv;
 
         kAddExplosion.setArg(0, pos);
         kAddExplosion.setArg(1, size);
