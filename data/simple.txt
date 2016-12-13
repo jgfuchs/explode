@@ -1,0 +1,28 @@
+SimParam {
+    grid 128
+    dt 0.04
+    nsteps 150
+    niters 40
+    walls 1
+}
+
+Camera {
+    pos 0.5 0.5 -4
+    size 400 400
+}
+
+Light {
+    pos 1.0 1.0 -1.0
+    intensity 4
+}
+
+Explosion {
+    pos .5 .17 .5
+    size 0.05
+    subex 1
+}
+
+Object {
+   pos 64 0 64
+   dim 128 2 128
+}
