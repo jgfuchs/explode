@@ -25,9 +25,8 @@ inline float4 getBlackbody(image2d_t Spec, float temp) {
     return read_imagef(Spec, samp_n, (float2)(temp / tMax, 0));
 }
 
-float trace_to_light(
+float3 trace_to_light(
     image3d_t T,
-    image3d_t B,
     image2d_t Spec,
     const struct Light *light,
     float3 pos0)
@@ -44,7 +43,7 @@ float trace_to_light(
         pos += dir;
     }
 
-    return tx;
+    return tx * light->intensity;
 }
 
 void __kernel render(
@@ -68,13 +67,12 @@ void __kernel render(
     float3 bg = {0.5, 0.5, 0.9};
     for (i = 0; i < nsamp; i++) {
         if (read_imageui(B, samp_ni, pos).x > 0.5f) {
-            float txl = trace_to_light(T, B, Spec, &light, pos);
-            float Li = light.intensity * txl;
+            float3 Li = trace_to_light(T, Spec, &light, pos);
 
             float3 L = normalize(light.pos - pos);
             float3 N = read_imagef(BN, samp_n, pos).xyz;
             float3 C = (float3)(.28, .36, .41);
-            bg = dot(L, N) * C * (txl * 1.5f);
+            bg = dot(L, N) * C * Li * 0.8f;
             break;
         }
 
@@ -85,13 +83,13 @@ void __kernel render(
             if (tx < TX_EPS) break;
 
             // incident light from light source (attenuated)
-            float Li = trace_to_light(T, B, Spec, &light, pos);
+            float3 Li = trace_to_light(T, Spec, &light, pos);
 
-            // blackbody radiation emitted
+            // blackbody radiation
             float4 bb = getBlackbody(Spec, Tsamp.x);
             float3 Le = bb.xyz * bb.w * 0.5f;
 
-            Lo += (Li + Le) * tx * rho * ds;
+            Lo += (Li + Le * tx) * rho * ds;
         }
 
         pos += dir;

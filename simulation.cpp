@@ -210,7 +210,6 @@ void Simulation::project() {
     std::swap(Dvg, Dvg_tmp);
 
     // solve laplace(P) = div(U) for P
-    // this where we spend ~75% of GPU time
     const int niters = scene->params.niters;
     for (int i = 0; i < niters; i++) {
         kJacobi.setArg(0, P);
