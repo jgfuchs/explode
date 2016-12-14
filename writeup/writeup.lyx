@@ -94,7 +94,7 @@
 \begin_body
 
 \begin_layout Title
-Animating Explosions on the GPU
+Simulating Explosions on the GPU
 \end_layout
 
 \begin_layout Author
@@ -109,20 +109,205 @@ MIT 6.837 (Computer Graphics), Fall 2016
 Motivation
 \end_layout
 
+\begin_layout Standard
+It is apparently customary in the explosion simulation literature to begin
+ by pointing out that real explosions are rarely, if ever, encountered by
+ most people.
+ They are, however, ubiquitous in films and video games.
+\end_layout
+
+\begin_layout Standard
+Explosions also combine small- and large-scale physical phenomena: the explosion
+ itself happens very quickly in a relatively small region, while the resulting
+ fireball and plume of smoke go much slower in a much larger space.
+\end_layout
+
 \begin_layout Section
 Background
+\end_layout
+
+\begin_layout Standard
+Smoke and fire are both frequent subjects of computer graphics research,
+ and fluid simulation in general is a very heavily-studied.
+ And the computer-aided modeling of explosions dates to the very origin
+ of computers.
+ There are fewer papers specifically about explosions from a computer graphics
+ perspective, though.
 \end_layout
 
 \begin_layout Section
 Simulation
 \end_layout
 
+\begin_layout Subsection
+Fluid model
+\end_layout
+
+\begin_layout Standard
+This project takes the Eulerian approach to fluid simulation, storing the
+ system's state on a regular 3-dimensional grid.
+ Each cell in the grid is assigned values for the various fluid properties
+ (velocity, temperature, etc).
+\end_layout
+
+\begin_layout Standard
+To simplify simulation, it models air as an inviscid and incompressible
+ fluid.
+ While air does indeed have very low viscosity, it is not actually incompressibl
+e, and its compressibility gives rise to effects like shockwaves, which
+ play an important part in the physics of real explosions.
+ However, shockwaves are nearly invisible 
+\end_layout
+
+\begin_layout Standard
+The behavior of an inviscid, incompressible fluid is described the Navier-Stokes
+ equations:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align*}
+\frac{\partial\mathbf{u}}{\partial t}+(\mathbf{u}\cdot\nabla)\mathbf{\mathbf{u}}+\nabla p=\mathbf{F}\\
+\nabla\mathbf{u}=0
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Where 
+\begin_inset Formula $\mathbf{u}$
+\end_inset
+
+ is the velocity field, 
+\begin_inset Formula $p$
+\end_inset
+
+ is the pressure field, 
+\begin_inset Formula $\rho$
+\end_inset
+
+ is the fluid density, and 
+\begin_inset Formula $\mathbf{F}$
+\end_inset
+
+ represents the external forces acting on the fluid.
+ The second equation ensures incompressibility and the conservation of mass.
+\end_layout
+
+\begin_layout Subsection
+Combustion model
+\end_layout
+
+\begin_layout Standard
+As explained above, the fluid model does not support shockwaves, so the
+ simulated explosions will have to be deflagrations rather than detonations
+ (i.e., combustion propagates by heat transfer rather than by a shock front).
+ 
+\end_layout
+
+\begin_layout Standard
+The combustion model is derived from the one in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Kwatra2010"
+
+\end_inset
+
+.
+ Each cell contains mixture of air, fuel, and smoke.
+ Air is the default and is not stored explicitly.
+ Fuel is treated as having the same fluid properties as air, so a cell containin
+g fuel behaves exactly like one without any (ignoring combustion, of course).
+\end_layout
+
 \begin_layout Section
 Rendering
 \end_layout
 
+\begin_layout Standard
+The renderer uses a volumetric ray casting technique to render the state
+ after each timestep.
+ The renderer casts a ray from the eye/camera point through each pixel of
+ the image.
+ To avoid extra computation, the 
+\end_layout
+
+\begin_layout Standard
+Each cell can also emit light, with color and intensity determined by blackbody
+ radiation and scaled by the amount of smoke present.
+ For a blackbody at temperature 
+\begin_inset Formula $T$
+\end_inset
+
+, the emitted spectral radiance of wavelength 
+\begin_inset Formula $\lambda$
+\end_inset
+
+ is given by Planck's equation: 
+\begin_inset Formula 
+\[
+L(\lambda,T)=\frac{C_{1}}{\lambda^{5}(e^{C_{2}/(\lambda T)}-1)}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+where 
+\begin_inset Formula $C_{1}\approx3.7418\cdot10^{-16}\,Wm^{2}$
+\end_inset
+
+ and 
+\begin_inset Formula $C_{2}\approx1.4388\cdot10^{-2}\,mK$
+\end_inset
+
+.
+ During initialization we generate a mapping from temperature to RGB color
+ values by sampling the range of possible temperature values at regular
+ intervals (from 0 to an arbitrarily chosen 
+\begin_inset Formula $t_{max}=6000$
+\end_inset
+
+K);
+\end_layout
+
+\begin_layout Section
+Implementation
+\end_layout
+
+\begin_layout Standard
+The simulation and rendering code are both written in OpenCL and run entirely
+ on the GPU.
+ The CPU-side code, written in C++, is responsible for reading the config
+ file, setting up the OpenCL context, allocating – but not filling – blocks
+ of video memory, and enqueuing commands to the GPU.
+ 
+\end_layout
+
 \begin_layout Section
 Results
+\end_layout
+
+\begin_layout Standard
+Unfortunately, the only GPU that I had access to was the integrated Intel
+ one in my three-year-old laptop.
+ While this still provided a massive , and (on a 128x128x128 grid with 256
+ samples per ray).
+ Every step of the simulation is 
+\begin_inset Quotes eld
+\end_inset
+
+embarrasingly parallel
+\begin_inset Quotes erd
+\end_inset
+
+, so there is good reason to believe that it would scale very well to GPUs
+ with many more cores.
 \end_layout
 
 \begin_layout Standard
