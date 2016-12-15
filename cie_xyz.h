@@ -3,6 +3,7 @@
 #define N_CIE 81
 
 // CIE coefficients for wavelengths 380 to 780 nm
+// from https://www.fourmilab.ch/documents/specrend/
 // (4th value is for 16-byte alignment)
 static const cl_float cie_coeffs[N_CIE][4] = {
     {0.0014,0.0000,0.0065,0}, {0.0022,0.0001,0.0105,0}, {0.0042,0.0001,0.0201,0},
@@ -33,3 +34,5 @@ static const cl_float cie_coeffs[N_CIE][4] = {
     {0.0002,0.0001,0.0000,0}, {0.0002,0.0001,0.0000,0}, {0.0001,0.0000,0.0000,0},
     {0.0001,0.0000,0.0000,0}, {0.0001,0.0000,0.0000,0}, {0.0000,0.0000,0.0000,0}
 };
+
+

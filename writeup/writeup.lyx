@@ -7,7 +7,7 @@
 \textclass article
 \begin_preamble
 \date{}
-\hypersetup{citecolor=blue}
+\hypersetup{citecolor=blue,linkcolor=blue,urlcolor=blue}
 
 \usepackage{sectsty}
 \sectionfont{\fontsize{14}{15}\selectfont}
@@ -94,7 +94,7 @@
 \begin_body
 
 \begin_layout Title
-Simulating Explosions on the GPU
+Simulating and Rendering Explosions on the GPU
 \end_layout
 
 \begin_layout Author
@@ -111,28 +111,58 @@ Motivation
 
 \begin_layout Standard
 It is apparently customary in the explosion simulation literature to begin
- by pointing out that real explosions are rarely, if ever, encountered by
- most people.
- They are, however, ubiquitous in films and video games.
+ by pointing out that real explosions are rarely encountered by most people.
+ They are, however, ubiquitous in films and video games, and pose interesting
+ simulation and rendering problems.
+ Explosions combine fire and smoke, which are closely related but behave
+ and appear very differently.
+ They also combine small- and large-scale physical phenomena: the explosion
+ itself happens very quickly in a relatively small region, while the resulting
+ fireball and plume of smoke move much more slowly through a much larger
+ space.
 \end_layout
 
 \begin_layout Standard
-Explosions also combine small- and large-scale physical phenomena: the explosion
- itself happens very quickly in a relatively small region, while the resulting
- fireball and plume of smoke go much slower in a much larger space.
+The reasons for the GPU-centric approach are twofold.
+ First, modern GPUs can be literally thousands of times faster than CPUs
+ for highly parallelizable workloads.
+ Both the simulation and rendering steps are computationally intensive and
+ 
+\begin_inset Quotes eld
+\end_inset
+
+embarrassingly parallel,
+\begin_inset Quotes erd
+\end_inset
+
+ so 
+\shape italic
+not 
+\shape default
+implementing them on the GPU seems like it would be a wasted opportunity.
+ Second and more personally, having worked at NVIDIA last summer on a project
+ very far from the graphics layer, I was curious about working with GPUs
+ from the user perspective.
 \end_layout
 
 \begin_layout Section
-Background
+Previous work
 \end_layout
 
 \begin_layout Standard
-Smoke and fire are both frequent subjects of computer graphics research,
- and fluid simulation in general is a very heavily-studied.
+Smoke and fire are both frequently written about in the computer graphics
+ world, and fluid simulation in general is a very heavily-studied field.
  And the computer-aided modeling of explosions dates to the very origin
  of computers.
- There are fewer papers specifically about explosions from a computer graphics
- perspective, though.
+ Despite this, there are relatively few papers published specifically about
+ explosions from a computer graphics perspective.
+\end_layout
+
+\begin_layout Standard
+I read every paper I could find about explosions in graphics, and developed
+ my implementation by combining ideas from several of them.
+ I also drew from a few more general papers about fluids, smoke, and flames.
+ Papers will be referenced where their ideas are used.
 \end_layout
 
 \begin_layout Section
@@ -145,26 +175,27 @@ Fluid model
 
 \begin_layout Standard
 This project takes the Eulerian approach to fluid simulation, storing the
- system's state on a regular 3-dimensional grid.
- Each cell in the grid is assigned values for the various fluid properties
- (velocity, temperature, etc).
+ system's state on a regular three-dimensional grid.
+ Each cell, or voxel, in the grid contains values for the various fluid
+ properties (velocity, temperature, etc.).
+ Since the fluid in question is a gas, there are no free surfaces, only
+ fluid-solid boundaries.
+ Solid objects are voxelized and represented directly on the grid.
 \end_layout
 
 \begin_layout Standard
-To simplify simulation, it models air as an inviscid and incompressible
+To simplify simulation, air is modeled as an inviscid and incompressible
  fluid.
  While air does indeed have very low viscosity, it is not actually incompressibl
-e, and its compressibility gives rise to effects like shockwaves, which
- play an important part in the physics of real explosions.
- However, shockwaves are nearly invisible 
+e, and its compressibility gives rise to effects like shockwaves that play
+ an important part in the physics of real explosions.
+ However, shockwaves are nearly invisible and for this project I chose to
+ focus on more easily-visualized secondary effects like fire and smoke.
 \end_layout
 
 \begin_layout Standard
-The behavior of an inviscid, incompressible fluid is described the Navier-Stokes
- equations:
-\end_layout
-
-\begin_layout Standard
+The behavior of an inviscid, incompressible fluid is governed by the Navier-Stok
+es equations:
 \begin_inset Formula 
 \begin{align*}
 \frac{\partial\mathbf{u}}{\partial t}+(\mathbf{u}\cdot\nabla)\mathbf{\mathbf{u}}+\nabla p=\mathbf{F}\\
@@ -173,11 +204,7 @@ The behavior of an inviscid, incompressible fluid is described the Navier-Stokes
 
 \end_inset
 
-
-\end_layout
-
-\begin_layout Standard
-Where 
+where 
 \begin_inset Formula $\mathbf{u}$
 \end_inset
 
@@ -185,16 +212,174 @@ Where
 \begin_inset Formula $p$
 \end_inset
 
- is the pressure field, 
-\begin_inset Formula $\rho$
-\end_inset
-
- is the fluid density, and 
+ is the pressure field, and 
 \begin_inset Formula $\mathbf{F}$
 \end_inset
 
- represents the external forces acting on the fluid.
- The second equation ensures incompressibility and the conservation of mass.
+ represents all external forces such as gravity.
+ The second equation states that the velocity field is divergence-free,
+ which ensures incompressibility and mass conservation; both of those constraint
+s will need to be loosened to simulate explosions.
+\end_layout
+
+\begin_layout Standard
+To solve these equations, I used the advection-projection approach described
+ by Stam in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Stam1999,Stam2003"
+
+\end_inset
+
+.
+ Some useful implementation tips also came from 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Bridson2007"
+
+\end_inset
+
+, particularly regarding discretization.
+ The first core idea of this method is the semi-Lagrangian advection scheme,
+ which updates a cell's values by tracing 
+\begin_inset Formula $\mathbf{u}$
+\end_inset
+
+ backwards to a 
+\begin_inset Quotes eld
+\end_inset
+
+start point
+\begin_inset Quotes erd
+\end_inset
+
+ and then advecting forwards the interpolated values at that point.
+ This is how temperature, smoke, fuel, and the velocity field itself are
+ transported by the fluid's motion.
+ The second idea is projection, which maintains the divergence-free property
+ of 
+\begin_inset Formula $\mathbf{u}$
+\end_inset
+
+; it relies on the fact that 
+\begin_inset Formula $\mathbf{u}$
+\end_inset
+
+ can always be expressed as the sum of a divergence-free field and a gradient
+ field (the Hodge decomposition).
+ The advected velocity field 
+\begin_inset Formula $\mathbf{w}$
+\end_inset
+
+ produced by the semi-Lagrangian method above will likely not be divergence-free
+; to fix that, solve the equation 
+\begin_inset Formula $\nabla^{2}p=\nabla\cdot\mathbf{w}$
+\end_inset
+
+ for pressure and compute a new divergence-free velocity 
+\begin_inset Formula $\mathbf{u}'=\mathbf{w}-\nabla p$
+\end_inset
+
+.
+ For a full derivation see 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Stam1999"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The pressure-solving step is by far the most computationally-intensive,
+ taking around 80% of the time spent simulating (i.e., not rendering).
+ I use the Jacobi iterative method, which is neither the fastest nor the
+ most accurate, but is quite simple and usually good enough.
+ Given more time I would have liked to switch to a preconditioned conjugate
+ gradient method as in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Bolz2003"
+
+\end_inset
+
+ and 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Bridson2007"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The advantages of this advection-projection method are that it is relatively
+ straightforward to implement, even on a GPU, and that it is unconditionally
+ stable, avoiding any unwanted 
+\begin_inset Quotes eld
+\end_inset
+
+explosions
+\begin_inset Quotes erd
+\end_inset
+
+.
+ One disadvantage is that it leads to numerical dissipation, a gradual damping
+ and fading of the fluid's fields.
+ This can actually be useful in some cases – it diffuses smoke and heat
+ without having to explicitly model that process.
+ However, it also results in much smoother smoke plumes than one would expect
+ from an explosion.
+ To add some turbulence back in, I implemented vorticity confinement, as
+ first described in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Fedkiw2001"
+
+\end_inset
+
+: first find the vorticity field 
+\begin_inset Formula $\omega=\nabla\times\mathbf{u}$
+\end_inset
+
+ and compute 
+\begin_inset Formula $\eta=\nabla|w|$
+\end_inset
+
+ and 
+\begin_inset Formula $\mathbf{N}=\eta/|\eta|$
+\end_inset
+
+.
+ Then the vorticity confinement force (added to the 
+\begin_inset Formula $\mathbf{F}$
+\end_inset
+
+ component of the Navier-Stokes equation) is:
+\begin_inset Formula 
+\[
+\mathbf{f}_{vc}=\epsilon h(\mathbf{N}\times\omega)
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $\epsilon>0$
+\end_inset
+
+ is an adjustable parameter and 
+\begin_inset Formula $h$
+\end_inset
+
+ is the cell side length.
+ Values of 
+\begin_inset Formula $\epsilon$
+\end_inset
+
+ from roughly 5 to 10 result in good-looking swirly structures in the smoke;
+ higher values result in noisier but probably more realistic plumes.
 \end_layout
 
 \begin_layout Subsection
@@ -203,13 +388,29 @@ Combustion model
 
 \begin_layout Standard
 As explained above, the fluid model does not support shockwaves, so the
- simulated explosions will have to be deflagrations rather than detonations
- (i.e., combustion propagates by heat transfer rather than by a shock front).
- 
+ simulated explosions are deflagrations rather than detonations (that is,
+ combustion is propagated by heat transfer rather than by a shock front).
+ This kind of explosion includes both liquid/vapor explosions (e.g., gasoline,
+ natural gas) and 
+\begin_inset Quotes eld
+\end_inset
+
+suspended particle
+\begin_inset Quotes erd
+\end_inset
+
+ explosions (e.g., coal, sawdust) as described in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Feldman2003"
+
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Standard
-The combustion model is derived from the one in 
+The heat and combustion model is similar to the one in 
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Kwatra2010"
@@ -217,10 +418,93 @@ key "Kwatra2010"
 \end_inset
 
 .
- Each cell contains mixture of air, fuel, and smoke.
- Air is the default and is not stored explicitly.
- Fuel is treated as having the same fluid properties as air, so a cell containin
-g fuel behaves exactly like one without any (ignoring combustion, of course).
+ Each cell contains a mixture of air, fuel, and smoke.
+ Air is the default and its amount is not stored explicitly.
+ Fuel, when not burning, has no effect on the dynamics of the fluid.
+ Smoke is heavier than air and slowly sinks, though that force is usually
+ countered by buoyancy (a force applied to each cell proportional to how
+ much hotter it is than the ambient temperature).
+ Lastly, cooling is simulated using a physically derived equation found
+ in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Nguyen2002"
+
+\end_inset
+
+:
+\begin_inset Formula 
+\[
+T'=T-c_{t}\left(\frac{T-T_{amb}}{T_{max}-T_{amb}}\right)^{4}
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $c_{t}$
+\end_inset
+
+ is the cooling constant, 
+\begin_inset Formula $T_{amb}$
+\end_inset
+
+ is the ambient temperature, and 
+\begin_inset Formula $T_{max}$
+\end_inset
+
+ is an arbitrarily-chosen maximum temperature (6000K in the simulation).
+\end_layout
+
+\begin_layout Standard
+Combustion occurs if a cell contains fuel and has a temperature above the
+ ignition point (set to 500K, just below the autoignition point of gasoline).
+ Fuel burns at a fixed rate and produces a proportional amount of smoke
+ and heat.
+ To mimic the rapid gas expansion caused by real combustion, I use the technique
+ introduced in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Feldman2003"
+
+\end_inset
+
+: a combusting cell has its divergence artificially augmented by an amount
+ proportional to the fuel consumed; that is, instead of solving 
+\begin_inset Formula $\nabla\mathbf{u}=0$
+\end_inset
+
+, the projection step will solve for 
+\begin_inset Formula $\nabla\mathbf{u}=\phi$
+\end_inset
+
+, where 
+\begin_inset Formula $\phi$
+\end_inset
+
+ is the extra divergence.
+ The rates of fuel consumption and heat, smoke, and divergence production
+ are configurable parameters whose values significantly affect the behavior
+ of the explosion, with the divergence rate acting as a sort of 
+\begin_inset Quotes eld
+\end_inset
+
+explosiveness
+\begin_inset Quotes erd
+\end_inset
+
+ factor.
+\end_layout
+
+\begin_layout Standard
+The results of this method, despite the essentially non-physical explosion
+ mechanism, are quite impressive.
+ An explosion can be created by adding a region of concentrated fuel with
+ a high-temperature region in the center.
+ The explosion expands rapidly, consuming all the fuel in a fraction of
+ a second and producing a large amount of hot smoke.
+ As the smoke cools and rises, it forms a realistic-looking plume, which
+ through careful choice of parameters can even be made to resemble a mushroom
+ cloud.
 \end_layout
 
 \begin_layout Section
@@ -228,16 +512,115 @@ Rendering
 \end_layout
 
 \begin_layout Standard
-The renderer uses a volumetric ray casting technique to render the state
- after each timestep.
- The renderer casts a ray from the eye/camera point through each pixel of
- the image.
- To avoid extra computation, the 
+The renderer uses a volumetric ray casting method derived mainly from 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Fedkiw2001"
+
+\end_inset
+
+.
+ A more complex photon-mapping renderer that accounts for internal scattering
+ is also presented in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Fedkiw2001"
+
+\end_inset
+
+, but is unnecessary for the low-albedo smoke dealt with here.
+ For emission-related details and general implementation techniques, I also
+ referred to 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Wrenninge2010"
+
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Standard
-Each cell can also emit light, with color and intensity determined by blackbody
- radiation and scaled by the amount of smoke present.
+First, the renderer casts a ray from the eye through each pixel of the image
+ plane.
+ Then, starting at the intersection with the bounding cube, it marches along
+ the ray, sampling the voxel grid at equidistant points.
+ The step size is 
+\begin_inset Formula $\sqrt{3}/n_{steps}$
+\end_inset
+
+, with 
+\begin_inset Formula $n_{steps}$
+\end_inset
+
+ typically set to double the grid side length and 
+\begin_inset Formula $\sqrt{3}$
+\end_inset
+
+ being the length of the cube's diagonal.
+\end_layout
+
+\begin_layout Standard
+Each ray keeps track of a transmittance value 
+\begin_inset Formula $t$
+\end_inset
+
+ as it progresses through the grid.
+ At each cell, 
+\begin_inset Formula $t$
+\end_inset
+
+ is reduced slightly in order to account for the absorption and scattering
+ of light.
+ The new value is 
+\begin_inset Formula $t'=(1-\rho\sigma)t$
+\end_inset
+
+, where 
+\begin_inset Formula $\rho$
+\end_inset
+
+ is the density of smoke in the cell and 
+\begin_inset Formula $\sigma$
+\end_inset
+
+ is a constant describing the absorbance of the smoke.
+ When 
+\begin_inset Formula $t$
+\end_inset
+
+ falls below a threshold, the ray terminates early – anything farther along
+ would be completely occluded by the smoke in front of it.
+\end_layout
+
+\begin_layout Standard
+To determine the amount of light entering each cell, the renderer also traces
+ rays from each cell towards a point light source.
+ The incident-light value 
+\shape italic
+
+\begin_inset Formula $L_{i}$
+\end_inset
+
+
+\shape default
+ of the cell is set to the light source's intensity scaled by the transmittance
+ of this secondary ray.
+ This allows the smoke to both shadow itself and cast shadows on any solid
+ objects in the scene.
+ Since the transmittance is a value in the range 
+\begin_inset Formula $[0,1]$
+\end_inset
+
+, the shadows have dark and light regions depending on the thickness of
+ the smoke, as one would expect.
+ (For efficiency, these secondary rays are only sent from cells that actually
+ contain smoke.)
+\end_layout
+
+\begin_layout Standard
+Each cell can also emit light with color and intensity determined by blackbody
+ radiation.
  For a blackbody at temperature 
 \begin_inset Formula $T$
 \end_inset
@@ -246,7 +629,7 @@ Each cell can also emit light, with color and intensity determined by blackbody
 \begin_inset Formula $\lambda$
 \end_inset
 
- is given by Planck's equation: 
+ is given by Planck's law:
 \begin_inset Formula 
 \[
 L(\lambda,T)=\frac{C_{1}}{\lambda^{5}(e^{C_{2}/(\lambda T)}-1)}
@@ -254,10 +637,6 @@ L(\lambda,T)=\frac{C_{1}}{\lambda^{5}(e^{C_{2}/(\lambda T)}-1)}
 
 \end_inset
 
-
-\end_layout
-
-\begin_layout Standard
 where 
 \begin_inset Formula $C_{1}\approx3.7418\cdot10^{-16}\,Wm^{2}$
 \end_inset
@@ -267,13 +646,40 @@ where
 \end_inset
 
 .
- During initialization we generate a mapping from temperature to RGB color
- values by sampling the range of possible temperature values at regular
- intervals (from 0 to an arbitrarily chosen 
-\begin_inset Formula $t_{max}=6000$
+ A lookup table mapping temperature to color is precomputed during initializatio
+n by sampling temperature values at regular intervals from 0 to 
+\begin_inset Formula $t_{max}$
 \end_inset
 
-K);
+, then for each temperature, integrating the equation above against the
+ CIE color-matching functions over the visible wavelengths (380 to 780 nm).
+ The resulting XYZ tristimulus values are converted to RGB by normalizing
+ them so that the brightest color has the value 1, then multiplying by the
+ relevant 3x3 matrix.
+ The light intensity is computed and stored as a fourth color component.
+ During rendering, the light 
+\begin_inset Formula $L_{e}$
+\end_inset
+
+ emitted by a cell is calculated by linearly interpolating the two colors
+ nearest to the cell's temperature and scaling by the intensity.
+\end_layout
+
+\begin_layout Standard
+The overall light sent back to the eye from a cell is 
+\begin_inset Formula $L_{o}=(L_{i}+L_{e})t$
+\end_inset
+
+, and the total light accumulated along a ray is the sum of that formula
+ for all intersected cells.
+ This captures how more obscured cells contribute less to the final output
+ color.
+\end_layout
+
+\begin_layout Standard
+Lastly, solid objects are rendered as perfectly diffuse surfaces using Lambertia
+n reflectance, which is not particularly interesting, but solids are not
+ the point of this renderer.
 \end_layout
 
 \begin_layout Section
@@ -281,12 +687,31 @@ Implementation
 \end_layout
 
 \begin_layout Standard
-The simulation and rendering code are both written in OpenCL and run entirely
+The simulation and rendering code are written in OpenCL and run entirely
  on the GPU.
- The CPU-side code, written in C++, is responsible for reading the config
- file, setting up the OpenCL context, allocating – but not filling – blocks
- of video memory, and enqueuing commands to the GPU.
- 
+ The choice of OpenCL instead of CUDA was made for me by the fact that I
+ had no NVIDIA GPUs on which to develop.
+ And moreover, this way the code should run on any GPU brand.
+ The CPU-side code, written in C++, is mainly responsible for some setup
+ procedures – reading the config file, setting up the OpenCL context, allocating
+ but not filling blocks of video memory – and periodically enqueuing commands
+ to the GPU.
+ It also saves the rendered images to disk as PNG files.
+ Because the state buffers are initialized by OpenCL code and never copied
+ back to the CPU side, there are essentially no significant memory transfers
+ apart from the output images.
+\end_layout
+
+\begin_layout Standard
+All the code, along with a number of config files describing various scenes,
+ are available on GitHub: 
+\begin_inset CommandInset href
+LatexCommand href
+target "https://github.com/jgfuchs/explode"
+
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Section
@@ -294,20 +719,37 @@ Results
 \end_layout
 
 \begin_layout Standard
-Unfortunately, the only GPU that I had access to was the integrated Intel
- one in my three-year-old laptop.
- While this still provided a massive , and (on a 128x128x128 grid with 256
- samples per ray).
- Every step of the simulation is 
-\begin_inset Quotes eld
+Unfortunately, the only GPU that I had access to during this project was
+ the Intel integrated chip in my three-year-old laptop.
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+Currently waiting on an Amazon AWS support ticket to let me launch GPU instances
+ on EC2.
+\end_layout
+
 \end_inset
 
-embarrasingly parallel
-\begin_inset Quotes erd
+ Though still providing several orders of magnitude more computational power
+ than the CPU, it was not able to run the code any faster than a few frames
+ per second (on a 128x128x128 grid with 256 samples per ray).
+ Due to the highly parallelizable nature of every step, I believe that performan
+ce would scale up very well on more powerful GPUs.
+ Back-of-the-envelope calculations suggest it could reach real-time performance
+ on an NVIDIA GTX 1070 or similar device.
+\end_layout
+
+\begin_layout Standard
+A compilation of videos produced by running the simulation on a number of
+ scenes with varying objects and parameters can be found here: 
+\begin_inset CommandInset href
+LatexCommand href
+target "https://www.youtube.com/watch?v=Jx933hGdaI4"
+
 \end_inset
 
-, so there is good reason to believe that it would scale very well to GPUs
- with many more cores.
+.
 \end_layout
 
 \begin_layout Standard
