@@ -14,6 +14,7 @@ list(APPEND SRC_FILES
 
 list(APPEND CL_FILES
     simulate.cl
+    render.cl
 )
 
 add_executable(explode ${SRC_FILES} ${CL_FILES})
