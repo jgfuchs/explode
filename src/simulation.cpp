@@ -77,7 +77,7 @@ void Simulation::initOpenCL() {
     queue = cl::CommandQueue(context, device, profiling ? CL_QUEUE_PROFILING_ENABLE : 0);
 
     // read & compile simulation program
-    program = cl::Program(context, slurpFile("simulate.cl"));
+    program = cl::Program(context, slurpFile("src/simulate.cl"));
     try {
         program.build();
     } catch (cl::Error err) {
@@ -95,7 +95,6 @@ void Simulation::initOpenCL() {
     kJacobi = cl::Kernel(program, "jacobi");
     kProject = cl::Kernel(program, "project");
     kSetBounds = cl::Kernel(program, "set_bounds");
-    // kRender = cl::Kernel(program, "render_slice");
     kRender = cl::Kernel(program, "render");
 
     // create buffers

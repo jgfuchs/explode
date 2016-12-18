@@ -314,4 +314,4 @@ void __kernel add_explosion(
 }
 
 
-#include "render.cl"
+#include "src/render.cl"
