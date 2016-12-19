@@ -4,12 +4,11 @@ Simulating and rendering explosions on the GPU. Final project for MIT 6.837, Fal
 
 Demo video [on Youtube](https://www.youtube.com/watch?v=Jx933hGdaI4).
 
-Project writeup PDF [here](https://github.com/jgfuchs/explode/blob/master/writeup/writeup.pdf).
-
 TODO: 
 
-- [ ] move more parameters into scene files
-- [ ] implement BFECC or MacCormack advection
-- [ ] better solid simulation -- two way coupling
-- [ ] better solid rendering
+- [ ] Add more parameters to scene files
+- [ ] More advanced advection (BFECC or MacCormack)
+- [ ] Better solids
+  - [ ] Two-way coupling
+  - [ ] Better rendering (lighting)
 
