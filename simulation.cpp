@@ -294,7 +294,7 @@ void Simulation::enqueueGrid(cl::Kernel kernel) {
     queue.enqueueNDRangeKernel(kernel,
         cl::NullRange,          // 0 offset
         cl::NDRange(N, N, N),   // global size
-        cl::NDRange(8, 8, 8),   // local (workgroup) size
+        cl::NDRange(8, 8, 4),   // local (workgroup) size
         NULL, &event);
 }
 

@@ -18,10 +18,10 @@ __constant const int
     // nsamp = 128,        // main ray samples
     // nlsamp = 64;        // light ray samples
 __constant const float
-    maxDist = 1.7320508,       // cube diagonal = sqrt(3)
+    maxDist = 1.7320508f,       // cube diagonal = sqrt(3)
     ds = maxDist / nsamp,       // main ray step size
     dsl = maxDist / nlsamp,     // light ray step size
-    absorption = 30.0;
+    absorption = 30.0f;
 
 inline float4 getBlackbody(image2d_t Spec, float temp) {
     return read_imagef(Spec, samp_n, (float2)(temp / tMax, 0));
@@ -38,7 +38,7 @@ float3 trace_to_light(
     float tx = 1.0f;
 
     for (int i = 0; i < nlsamp; i++) {
-        float rho = read_imagef(T, samp_n, pos).y;
+        float rho = read_imagef(T, samp_n, to4f(pos)).y;
         tx *= 1.0f - rho * dsl * absorption;
         if (tx < TX_EPS) break;
 
@@ -62,24 +62,24 @@ void __kernel render(
     float3 pos = {1.0f*imgPos.x/cam.size.x, 1.0f*imgPos.y/cam.size.y, 0};
     float3 dir = normalize(pos - cam.pos) * ds;
 
-    float tx = 1.0;      // transmittance along ray
-    float3 Lo = 0.0;     // total light output from ray
+    float tx = 1.0f;      // transmittance along ray
+    float3 Lo = 0.0f;     // total light output from ray
 
     int i, j;
-    float3 bg = {0.5, 0.5, 0.9};
+    float3 bg = {0.5f, 0.5f, 0.9f};
     for (i = 0; i < nsamp; i++) {
-        if (read_imageui(B, samp_ni, pos).x == 1) {
+        if (read_imageui(B, samp_ni, to4f(pos)).x == 1) {
             float3 Li = trace_to_light(T, Spec, &light, pos);
 
             // diffuse reflection
             float3 L = normalize(light.pos - pos);
-            float3 N = read_imagef(BN, samp_n, pos).xyz;
-            float3 C = (float3)(.28, .36, .41);
+            float3 N = read_imagef(BN, samp_n, to4f(pos)).xyz;
+            float3 C = (float3)(0.28f, 0.36f, 0.41f);
             bg = dot(L, N) * C * Li * 0.8f;
             break;
         }
 
-        float4 Tsamp = read_imagef(T, samp_n, pos);
+        float4 Tsamp = read_imagef(T, samp_n, to4f(pos));
         float rho = Tsamp.y;
         if (rho > RHO_EPS) {
             tx *= 1.0f - rho * ds * absorption;
@@ -154,11 +154,11 @@ void __kernel render_slice(
 // Planck's equation for blackbody radiation
 //  (wl=wavelength  in nm, t=temperature in K)
 float planck(float wl, float t) {
-    const float C1 = 3.74183e-16;   // 2*pi*h*c^2
-    const float C2 = 1.4388e-2;     // h*c/k
+    const float C1 = 3.74183e-16f;   // 2*pi*h*c^2
+    const float C2 = 1.4388e-2f;     // h*c/k
 
-    wl *= 1e-9;
-    return C1 * pown(wl, -5) / (exp(C2 / (wl * t)) - 1.0f) * 1e-9;
+    wl *= 1e-9f;
+    return C1 * pown(wl, -5) / (exp(C2 / (wl * t)) - 1.0f) * 1e-9f;
 }
 
 void __kernel gen_blackbody(
@@ -187,9 +187,9 @@ void __kernel gen_blackbody(
 
     // XYZ to sRGB conversion matrix
     const float3 sRGB[3] = {
-        { 3.2404542, -1.5371385, -0.4985314},
-        {-0.9692660,  1.8760108,  0.0415560},
-        { 0.0556434, -0.2040259,  1.0572252}
+        { 3.2404542f, -1.5371385f, -0.4985314f},
+        {-0.9692660f,  1.8760108f,  0.0415560f},
+        { 0.0556434f, -0.2040259f,  1.0572252f}
     };
     float3 rgb = {dot(sRGB[0], xyz), dot(sRGB[1], xyz), dot(sRGB[2], xyz)};
 
@@ -204,7 +204,7 @@ void __kernel gen_blackbody(
 
 
 inline uint4 ixu(image3d_t img, int3 c) {
-    return read_imageui(img, samp_i, c);
+    return read_imageui(img, samp_i, to4i(c));
 }
 
 void __kernel gen_normals(
@@ -213,7 +213,7 @@ void __kernel gen_normals(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     if (ixu(B, pos).x != 1) {
-        write_imagef(BN, pos, (float4)(1));
+        wx(BN, pos, (float4)(1));
         return;
     }
 
@@ -230,5 +230,5 @@ void __kernel gen_normals(
     n += ixu(B, pos-dz).x == 0 ? -fdz : 0;
     n = normalize(n);
 
-    write_imagef(BN, pos, (float4)(n, 0));
+    wx(BN, pos, (float4)(n, 0));
 }

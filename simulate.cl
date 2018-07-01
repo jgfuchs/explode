@@ -27,13 +27,13 @@ __constant sampler_t samp_ni =
 // convention: c* = coefficient, t* = temperature, r* = rate
 __constant const float
     // general constants
-    h           = 0.25,     // cell side length (m)
+    h           = 0.25f,     // cell side length (m)
     hinv        = 1.0f/h,   // cells per unit length
-    grav        = 9.8,      // acceleration due to gravity (m/s^2)
-    cVort       = 8.0,     // vorticity confinement
+    grav        = 9.8f,      // acceleration due to gravity (m/s^2)
+    cVort       = 8.0f,     // vorticity confinement
     // heat-related
-    cBuoy       = 0.04*h,   // buoyancy multiplier
-    cSink       = 0.3,      // smoke sinking
+    cBuoy       = 0.04f*h,   // buoyancy multiplier
+    cSink       = 0.3f,      // smoke sinking
     cCooling    = 1200,     // cooling
     tAmb        = 300,      // ambient temperature (K)
     tMax        = 6000,     // "maximum" temperature (K)
@@ -41,9 +41,9 @@ __constant const float
     tIgnite     = 500,      // (auto)ignition temperature (K)
     rBurn       = 4,        // fuel burn rate (amt/sec)
     rHeat       = 2400,     // heat production rate (K/s/fuel)
-    rSmoke      = 1.0,      // smoke/soot production rate
+    rSmoke      = 1.0f,      // smoke/soot production rate
     rDvg        = 18,       // extra divergence = "explosiveness"
-    rSmokeDiss  = 0.008;    // smoke dissipation/dissappearance
+    rSmokeDiss  = 0.008f;    // smoke dissipation/dissappearance
 
 
 __constant int3 dx = {1, 0, 0},
@@ -54,10 +54,22 @@ struct Object {
     float3 pos, dim;
 };
 
+inline int4 to4i(int3 c) {
+	return (int4)(c, 0);
+}
+
+inline float4 to4f(float3 f) {
+	return (float4)(f, 0);
+}
+
 
 // lookup value at coordinate (i, j, k) in image
 inline float4 ix(image3d_t img, int3 c) {
-    return read_imagef(img, samp_i, c);
+    return read_imagef(img, samp_i, to4i(c));
+}
+
+inline void wx(image3d_t img, int3 c, float4 v) {
+	write_imagef(img, to4i(c), v);
 }
 
 
@@ -70,8 +82,8 @@ void __kernel init_grid(
     __write_only image3d_t B)       // boundaries
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    write_imagef(U, pos, (float4)(0));
-    write_imagef(T, pos, (float4)(0));
+    wx(U, pos, (float4)(0));
+    wx(T, pos, (float4)(0));
 
     int nx = get_image_width(B),
         ny = get_image_height(B),
@@ -100,7 +112,7 @@ void __kernel init_grid(
          }
     }
 
-    write_imageui(B, pos, b);
+    write_imageui(B, to4i(pos), b);
 }
 
 
@@ -114,10 +126,10 @@ void __kernel advect(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     float3 fpos = convert_float3(pos) + 0.5f;
-    float3 p0 = fpos - dt * hinv * read_imagef(U, pos).xyz;
+    float3 p0 = fpos - dt * hinv * ix(U, pos).xyz;
 
-    write_imagef(U_out, pos, read_imagef(U, samp_f, p0));
-    write_imagef(T_out, pos, read_imagef(T, samp_f, p0));
+    wx(U_out, pos, read_imagef(U, samp_f, to4f(p0)));
+    wx(T_out, pos, read_imagef(T, samp_f, to4f(p0)));
 }
 
 
@@ -146,7 +158,7 @@ void __kernel curl(
     curl.xyz *= 0.5f * hinv;
     curl.w = length(curl.xyz);
 
-    write_imagef(Curl, pos, curl);
+    wx(Curl, pos, curl);
 }
 
 
@@ -158,7 +170,7 @@ void __kernel add_forces(
     __write_only image3d_t U_out)
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
-    float4 therm = read_imagef(T,  pos);
+    float4 therm = ix(T, pos);
 
     // force accumulator
     float3 f = 0;
@@ -180,9 +192,9 @@ void __kernel add_forces(
     // force = eps * (|eta| x curl U) * dh
     f.xyz += cVort * cross(eta, ix(Curl, pos).xyz) * h;
 
-    float4 v = read_imagef(U, pos);
+    float4 v = ix(U, pos);
     v.xyz += dt * f;
-    write_imagef(U_out, pos, v);
+    wx(U_out, pos, v);
 }
 
 
@@ -195,7 +207,7 @@ void __kernel reaction(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
     // x = temperature, y = smoke, z = fuel
-    float4 f = read_imagef(T, pos);
+    float4 f = ix(T, pos);
 
     // cooling
     float r  = (f.x - tAmb) / (tMax - tAmb);
@@ -213,8 +225,8 @@ void __kernel reaction(
 
     f.y *= 1.0f - rSmokeDiss;
 
-    write_imagef(T_out, pos, f);
-    write_imagef(Dvg, pos, (float4)(dvg, 0, 0, 0));
+    wx(T_out, pos, f);
+    wx(Dvg, pos, (float4)(dvg, 0, 0, 0));
 }
 
 
@@ -226,15 +238,15 @@ void __kernel divergence(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
 
-    float d0 = read_imagef(Dvg, pos).x;
+    float d0 = ix(Dvg, pos).x;
     float d = -0.5f * h *
          ((ix(U, pos + dx).x - ix(U, pos - dx).x)
         + (ix(U, pos + dy).y - ix(U, pos - dy).y)
         + (ix(U, pos + dz).z - ix(U, pos - dz).z));
-    write_imagef(Dvg_out, pos, d0 + d);
+    wx(Dvg_out, pos, d0 + d);
 
     // avoid a call to enqueueFillImage by zeroing pressure field here
-    write_imagef(P, pos, 0);
+    wx(P, pos, 0);
 }
 
 
@@ -246,8 +258,8 @@ void __kernel jacobi(
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     float f = ((ix(P, pos + dx).x + ix(P, pos - dx).x
               + ix(P, pos + dy).x + ix(P, pos - dy).x
-              + ix(P, pos + dz).x + ix(P, pos - dz).x) + ix(Dvg, pos).x) / 6.0;
-    write_imagef(P_out, pos, f);
+              + ix(P, pos + dz).x + ix(P, pos - dz).x) + ix(Dvg, pos).x) / 6.0f;
+    wx(P_out, pos, f);
 }
 
 
@@ -264,9 +276,9 @@ void __kernel project(
         ix(P, pos + dz).x - ix(P, pos - dz).x
     };
 
-    float3 vOld = read_imagef(U, pos).xyz;
+    float3 vOld = ix(U, pos).xyz;
     float3 vNew = vOld - 0.5f * hinv * gradP;
-    write_imagef(U_out, pos, (float4)(vNew, 0));
+    wx(U_out, pos, (float4)(vNew, 0));
 }
 
 
@@ -282,14 +294,14 @@ void __kernel set_bounds(
     float4 u = ix(U, pos);
     float4 t = ix(T, pos);
 
-    int b = read_imageui(B, pos).x;
+    int b = read_imageui(B, to4i(pos)).x;
     if (b) {
         u = 0;
         t = 0;
     }
 
-    write_imagef(U_out, pos, u);
-    write_imagef(T_out, pos, t);
+    wx(U_out, pos, u);
+    wx(T_out, pos, t);
 }
 
 
@@ -301,16 +313,16 @@ void __kernel add_explosion(
 {
     int3 pos = {get_global_id(0), get_global_id(1), get_global_id(2)};
     int id = (get_image_depth(T) * pos.z + pos.y) * get_image_height(T) + pos.x;
-    float4 f = read_imagef(T, pos);
+    float4 f = ix(T, pos);
 
     // explosion positions are normalized coords
     float3 fpos = convert_float3(pos) / get_image_width(T);
     float d = distance(loc, fpos);
     if (d < size) {
-        f.xyz = (float3)(3000, 0, 1.25);
+        f.xyz = (float3)(3000, 0, 1.25f);
     }
 
-    write_imagef(T_out, pos, f);
+    wx(T_out, pos, f);
 }
 
 
